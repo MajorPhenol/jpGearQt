@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 15.0.1, 2025-02-22T17:07:18. -->
+<!-- Written by QtCreator 15.0.1, 2025-02-24T15:42:23. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -156,13 +156,12 @@
     <value type="QString" key="PerfRecordArgsId">-e cpu-cycles --call-graph dwarf,4096 -F 250</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">jpgearqt.py</value>
     <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">PythonEditor.RunConfiguration.</value>
-    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">/mnt/media/code/qt/jpgear/jpgearqt.py</value>
+    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">/mnt/media/code/qt/jpGearQt/jpgearqt.py</value>
     <value type="bool" key="ProjectExplorer.RunConfiguration.Customized">true</value>
-    <value type="QString" key="PythonEditor.RunConfiguation.Script">/mnt/media/code/qt/jpgear/jpgearqt.py</value>
+    <value type="QString" key="PythonEditor.RunConfiguation.Script">/mnt/media/code/qt/jpGearQt/jpgearqt.py</value>
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
-    <value type="int" key="RunConfiguration.UsePythonDebugger">0</value>
     <value type="bool" key="RunConfiguration.UseQmlDebuggerAuto">true</value>
-    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/mnt/media/code/qt/jpgear</value>
+    <value type="QString" key="RunConfiguration.WorkingDirectory.default">/mnt/media/code/qt/jpGearQt</value>
     <value type="QString" key="RunConfiguration.X11Forwarding">:0</value>
    </valuemap>
    <value type="qlonglong" key="ProjectExplorer.Target.RunConfigurationCount">1</value>

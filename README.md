@@ -1,5 +1,6 @@
 # jpGearQt
 A simple GUI gear designer.
+![spinning gears](img/spinningGears.gif)
 
 ## Installation
 

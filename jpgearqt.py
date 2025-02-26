@@ -1,7 +1,7 @@
 # This Python file uses the following encoding: utf-8
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QStyle
-from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QStyle, QMenuBar, QMenu, QFileDialog
+from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction
 from PySide6.QtCore import Qt
 
 # Important:
@@ -17,10 +17,10 @@ import numpy as np
 from numpy import pi, sin, cos, tan, arcsin, arccos, arctan
 from numpy import rad2deg, deg2rad
 from numpy import sqrt, zeros, linspace, polyval, real
-# why isn't this in numpy???
-tau = 2*pi
 
-from scipy.optimize import fsolve
+from scipy.optimize import fsolve, least_squares
+# from scipy.optimize.elementwise import find_root
+# from scipy.optimize import find_root
 
 import matplotlib.pyplot as pyplot
 import matplotlib.path as mpath
@@ -33,7 +33,13 @@ from matplotlib.figure import Figure
 
 import copy
 
+import ezdxf
+from ezdxf.math import UCS
+from ezdxf import zoom
+
 ###############################################################################
+# why isn't this in numpy???
+tau = 2*pi
 
 def is_number(n):
     try:
@@ -213,9 +219,26 @@ class jpgearqt(QWidget):
 
         self.initGearDesignFields()
 
-###############################################################################
-# setup
+# Setup #######################################################################
     def connectUI(self):
+        # menu bar
+        menuBar = QMenuBar(self)
+
+        menuFile = menuBar.addMenu('&File')
+        actSave = menuFile.addAction('Save DXF')
+        actSave.setShortcut(QKeySequence("Ctrl+S"))
+        actSave.triggered.connect(lambda: self.saveDXF())
+
+        print(actSave)
+        print(menuFile)
+
+        menuHelp = QMenu('&Help')
+        menuHelp.addAction('Help Menu')
+
+
+        menuBar.addMenu(menuHelp)
+        self.ui.topLayout.insertWidget(0, menuBar)
+
         # First tab
         self.ui.pb_calcGearSizes.clicked.connect(lambda: self.findGearSizes())
         self.ui.le_pN.editingFinished.connect(lambda: self.updatePinionN())
@@ -273,11 +296,30 @@ class jpgearqt(QWidget):
         # animate button
         self.ui.pb_animate.clicked.connect(lambda: self.createAnimWindow())
 
-        # shortcuts
-        self.drawGearSC = QShortcut(QKeySequence("Ctrl+D"), self)
-        self.drawGearSC.activated.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
-        self.drawGearSC.activated.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
-        self.drawGearSC.activated.connect(lambda: self.drawMesh(_updateAxes=True))
+        # stress button
+        self.ui.pb_stress.clicked.connect(lambda: self.stress())
+
+        # shortcuts ###
+        # cycle tabs
+        self.SC_cycleTabFW = QShortcut(QKeySequence("PgDown"), self)
+        self.SC_cycleTabFW.activated.connect(lambda: self.cycleTab(dir='forward'))
+        self.SC_cycleTabRV = QShortcut(QKeySequence("PgUp"), self)
+        self.SC_cycleTabRV.activated.connect(lambda: self.cycleTab(dir='backward'))
+        # draw gears
+        self.SC_drawGear = QShortcut(QKeySequence("Ctrl+D"), self)
+        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: self.drawMesh(_updateAxes=True))
+
+    def cycleTab(self, dir='forward'):
+        tabs = self.ui.tabW_main
+
+        if dir=='forward':
+            newIndex = (tabs.currentIndex()+1) % tabs.count()
+            tabs.setCurrentIndex(newIndex)
+        elif dir=='backward':
+            newIndex = (tabs.currentIndex()-1) % tabs.count()
+            tabs.setCurrentIndex(newIndex)
 
     def setupCanvases(self):
         # layout helper tab
@@ -304,6 +346,19 @@ class jpgearqt(QWidget):
         # animation
         # self.canvasAnim = MplCanvas(self)
 
+        # stress
+        stress_layout1 = QVBoxLayout(self.ui.tab_stress1)
+        self.canvasStress1 = MplCanvas(self)
+        stress_layout1.addWidget(self.canvasStress1)
+        toolbarStress1 = NavigationToolbar2QT(self.canvasStress1, self)
+        stress_layout1.insertWidget(1, toolbarStress1)
+
+        stress_layout2 = QVBoxLayout(self.ui.tab_stress2)
+        self.canvasStress2 = MplCanvas(self)
+        stress_layout2.addWidget(self.canvasStress2)
+        toolbarStress2 = NavigationToolbar2QT(self.canvasStress2, self)
+        stress_layout2.insertWidget(1, toolbarStress2)
+
     def initGearDesignFields(self):
         self.ui.le_PA_deg.setText(str("{:.0f}".format((self.PA_deg))))
         self.ui.le_bkl.setText(str("{:.0f}".format(self.bkl)))
@@ -323,8 +378,11 @@ class jpgearqt(QWidget):
         self.ui.hSlider_Mesh.setMaximum(2*self.sliderScale)
         self.ui.hSlider_Mesh.setSliderPosition(1*self.sliderScale)    # pitch point happens at slider = 1
 
-###############################################################################
-# First tab
+    def saveDXF(self):
+        self.layoutGear(self.G1, save=True)
+        self.layoutGear(self.G2, save=True)
+
+# Helper Tab ##################################################################
     def findGearSizes(self):
         type = self.ui.cb_CD_width.currentIndex()
 
@@ -565,8 +623,7 @@ class jpgearqt(QWidget):
 
         self.canvasHelper.draw()
 
-###############################################################################
-# Second tab
+# Gear Design Tab #############################################################
     def set_mod(self, _mod):
         if is_number(_mod):
             self.mod = float(_mod)
@@ -655,7 +712,6 @@ class jpgearqt(QWidget):
         if is_number(_FW):
             _gear.FW = float(_FW)
 
-###############################################################################
     def updateToothThickness(self, _gear):
         if self.mod > 0 and self.PA > 0:
             _gear.tts = self.mod * (pi/2 + 2*_gear.x*tan(self.PA))
@@ -871,20 +927,25 @@ class jpgearqt(QWidget):
             return
 
         [R1, R2, tt1, tt2] = self.updatePitchRadius()
+        # update pitch radius
+        self.G1.Rp = R1.item()
+        self.G2.Rp = R2.item()
+        # update tooth thickness at new pitch radius
         self.G1.tt = tt1.item()
         self.G2.tt = tt2.item()
+
+        self.ui.lb_Rp1.setText(str("{:.3f}".format(self.G1.Rp)))
+        self.ui.lb_Rp2.setText(str("{:.3f}".format(self.G2.Rp)))
+        self.ui.lb_tt1.setText(str("{:.3f}".format(self.G1.tt)))
+        self.ui.lb_tt2.setText(str("{:.3f}".format(self.G2.tt)))
+
+        # update center distance
         self.CD = R1.item() + R2.item()
         self.ui.lb_CD.setText(str("{:.3f}".format(self.CD)))
 
         # Operating pressure angle at updated center distance
         self.OPA = arccos((self.G1.Rb+self.G2.Rb) / self.CD)
         self.OPA_deg = rad2deg(self.OPA)
-        # update pitch radius
-        self.G1.Rp = R1.item()
-        self.G2.Rp = R2.item()
-
-        self.ui.lb_Rp1.setText(str("{:.3f}".format(self.G1.Rp)))
-        self.ui.lb_Rp2.setText(str("{:.3f}".format(self.G2.Rp)))
 
         self.updateContactRatio()
         self.updateRootRadius(self.G1)
@@ -1028,20 +1089,12 @@ class jpgearqt(QWidget):
             _gear.theta_F = theta_F
 
 
-###############################################################################
-    def layoutGear(self, _gear):
+# Drawing #####################################################################
+    def layoutGear(self, _gear, save=False):
         G = _gear
-        # savePath = _save
 
-        circleList = []
-        # base circle
-        circleList.append(pyplot.Circle((0, 0), G.Rb, color='c', ls='--', fill=False))
-        # pitch circle
-        circleList.append(pyplot.Circle((0, 0), G.Rp, color='y', ls='--', fill=False))
-        # outer circle
-        circleList.append(pyplot.Circle((0, 0), G.Roe, color='g', ls='--', fill=False))
-        # root cirlce
-        circleList.append(pyplot.Circle((0, 0), G.Rr, color='r', ls='--', fill=False))
+        if G.N < 1:
+            return
 
         curveList = []
         curveColor = 'b'
@@ -1184,21 +1237,86 @@ class jpgearqt(QWidget):
                                         )
                             )
 
-        # # make copies of all the teeth
-        fullList = []
-        for n in range(G.N):
-            angle = (n/G.N)*tau
-            for curve in curveList:
-                newCurve = copy.copy(curve)
-                newCurve.set_transform(mtransforms.Affine2D().rotate(angle))
-                fullList.append(newCurve)
+        if save == True:
+            if G.ID == 1:
+                caption = 'Save Gear 1'
+                defaultName = 'gear1.dxf'
 
-        # circles
-        circleCollection = mcollections.PatchCollection(circleList, match_original=True)
-        # teeth
-        curveCollection = mcollections.PatchCollection(fullList, match_original=True)
+            else:
+                caption = 'Save Gear 2'
+                defaultName = 'gear2.dxf'
 
-        return curveCollection, circleCollection
+            savePath, selectedFilter = QFileDialog.getSaveFileName(self, 'Save Gear'+str(G.ID), defaultName)
+
+            doc = ezdxf.new()
+            msp = doc.modelspace()
+
+            for n in range(G.N):
+                    angle = (n/G.N)*tau
+                    ucs = UCS(origin=(0,0,0)).rotate_local_z(angle)
+
+                    # involute
+                    msp.add_lwpolyline(list(zip(RAx, RAy))).transform(ucs.matrix)
+                    msp.add_lwpolyline(list(zip(-RAx, RAy))).transform(ucs.matrix)
+
+                    # root fillet
+                    if G.Rf > 0:
+                            msp.add_arc((Fx, Fy), radius=G.Rf, start_angle=filletStartAngle, end_angle=filletEndAngle).transform(ucs.matrix)
+                            msp.add_arc((-Fx, Fy), radius=G.Rf, start_angle=180-filletEndAngle, end_angle=180-filletStartAngle).transform(ucs.matrix)
+
+                    # add straight line segment if undercut
+                    if G.undercut == True:
+                            msp.add_line((Rjfi_x, Rjfi_y), (Rb_x, Rb_y)).transform(ucs.matrix)
+                            msp.add_line((-Rjfi_x, Rjfi_y), (-Rb_x, Rb_y)).transform(ucs.matrix)
+
+                    # root radius
+                    if G.Rf < G.Rff :
+                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle1, end_angle=RREndAngle1).transform(ucs.matrix)
+                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle2, end_angle=RREndAngle2).transform(ucs.matrix)
+
+                    # tip radius
+                    if G.Rtip > 0:
+                            msp.add_arc((Rtip_x,Rtip_y), radius=G.Rtip, start_angle=tipStartAngle, end_angle=tipEndAngle).transform(ucs.matrix)
+                            msp.add_arc((-Rtip_x,Rtip_y), radius=G.Rtip, start_angle=180-tipEndAngle, end_angle=180-tipStartAngle).transform(ucs.matrix)
+
+                    # outer radius
+                    if G.Rtip < G.Rtip_max:
+                            msp.add_arc((0, 0), radius=G.Ro, start_angle=ODStartAngle, end_angle=ODEndAngle).transform(ucs.matrix)
+
+            zoom.extents(msp)
+            doc.saveas(str(savePath))
+
+        # save == False
+        else:
+            # make copies of all the teeth
+            fullList = []
+            for n in range(G.N):
+                angle = (n/G.N)*tau
+                for curve in curveList:
+                    newCurve = copy.copy(curve)
+                    newCurve.set_transform(mtransforms.Affine2D().rotate(angle))
+                    fullList.append(newCurve)
+
+            curveCollection = mcollections.PatchCollection(fullList, match_original=True)
+            return curveCollection
+
+    def addCircles(self, _gear, _canvas, collection=False):
+        circleList = []
+        # base circle
+        circleList.append(pyplot.Circle((0, 0), _gear.Rb, color='c', ls='--', fill=False, label='Base Circle'))
+        # # pitch circle
+        circleList.append(pyplot.Circle((0, 0), _gear.Rp, color='y', ls='--', fill=False, label='Pitch Circle'))
+        # # outer circle
+        circleList.append(pyplot.Circle((0, 0), _gear.Roe, color='g', ls='--', fill=False, label='Outer Circle'))
+        # # root cirlce
+        circleList.append(pyplot.Circle((0, 0), _gear.Rr, color='r', ls='--', fill=False, label='Root Circle'))
+
+        if collection == False:
+            for circle in circleList:
+                _canvas.axes.add_patch(circle)
+            _canvas.axes.legend(loc='upper left', framealpha=1.0)
+        else:
+            return mcollections.PatchCollection(circleList, match_original=True)
 
     def drawGear(self, _gear, _updateAxes = False):
         if _gear.ID == 1:
@@ -1233,12 +1351,31 @@ class jpgearqt(QWidget):
         canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
         canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
 
-        curveCol, circleCol = self.layoutGear(_gear)
+        curveCol = self.layoutGear(_gear)
         canvas.axes.add_collection(curveCol)
+
         if cb_circles.isChecked():
-            canvas.axes.add_collection(circleCol)
+            self.addCircles(_gear, canvas)
 
         canvas.draw()
+
+    def layoutStress(self, _gear, _canvas):
+        rightLimit = _gear.Rp*sin(tau/_gear.N)
+        leftLimit = -rightLimit
+        topLimit = _gear.Rp + rightLimit
+        bottomLimit = _gear.Rp - rightLimit
+
+        _canvas.axes.cla()
+
+        _canvas.axes.set_aspect('equal')
+        _canvas.axes.set_box_aspect(1)
+        _canvas.fig.tight_layout()
+
+        _canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
+        _canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
+
+        curveCol = self.layoutGear(_gear)
+        _canvas.axes.add_collection(curveCol)
 
     def drawMesh(self, _updateAxes = False):
         canvas = self.canvasMesh
@@ -1324,8 +1461,8 @@ class jpgearqt(QWidget):
         angle2 = curveStartAngle2 + (updateAngle * ratio)
 
         # draw everything
-        curveCol1, circleCol1 = self.layoutGear(self.G1)
-        curveCol2, circleCol2 = self.layoutGear(self.G2)
+        curveCol1 = self.layoutGear(self.G1)
+        curveCol2 = self.layoutGear(self.G2)
         curveCol2.set_edgecolor('r')
 
         curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1) + canvas.axes.transData)
@@ -1335,7 +1472,9 @@ class jpgearqt(QWidget):
         canvas.axes.add_collection(curveCol2)
 
         if cb_circles.isChecked():
-            canvas.axes.add_collection(circleCol1)
+            self.addCircles(self.G1, canvas, collection=False)
+
+            circleCol2 = self.addCircles(self.G2, canvas, collection=True)
             circleCol2.set_transform(mtransforms.Affine2D().translate(self.CD, 0) + canvas.axes.transData)
             canvas.axes.add_collection(circleCol2)
 
@@ -1406,73 +1545,198 @@ class jpgearqt(QWidget):
 
         window.show()
 
+# Stress ######################################################################
+    def stress(self):
+        if self.G1.N < 1 or self.G2.N < 1:
+            return
+        if self.G1.FW < 0 or self.G2.FW < 0:
+            return
 
-    # def createAnimWindow(self):
-    #     window = popupWindow(self)
-    #     window.setWindowTitle("Mesh Animation")
+        torque = float(self.ui.le_torque.text())
 
-    #     # window.canvas, curveCol1, curveCol2 = window.createCanvas(self)
-    #     window.updateCanvasPopup()
+        # use smallest face width
+        FW = min(self.G1.FW, self.G2.FW)
 
-    #     window.ui.vLayout_popup.insertWidget(0, window.canvas)
-    #     toolbar = NavigationToolbar2QT(window.canvas, self)
-    #     window.ui.hLayout_toolbarAnim.insertWidget(0, toolbar)
+        # convert torque to force through HPSTC tangent to base circle
+        w = torque / (self.G1.Rb * FW)
 
-    #     self.anim = window.createAnim()
+        # Stress concentration factor Kf
+        # from GOIG 11.24 - 11.26
+        # Note that GOIG uses degrees while AGMA 908 uses radians
+        k1 = 0.3054 - 0.00489*self.OPA_deg - 0.000069*self.OPA_deg**2
+        k2 = 0.3620 - 0.01268*self.OPA_deg + 0.000104*self.OPA_deg**2
+        k3 = 0.2934 + 0.00609*self.OPA_deg + 0.000087*self.OPA_deg**2
 
-    #     window.canvas.draw()
+        Kf1 = 1
+        Kf2 = 1
 
-    #     window.show()
+        # if self.G1.Rf == 0:
+        #     Kf1 = 1
+        # else:
+        #     Kf1 = k1 + ( (tt_LP1/self.G1.Rf)**k2 ) * ( (tt_LP1/h_LP1)**k3 )
+        # if self.G2.Rf == 0:
+        #     Kf2 = 1
+        # else:
+        #     Kf2 = k1 + ( (tt_LP2/self.G2.Rf)**k2 ) * ( (tt_LP2/h_LP2)**k3 )
 
-    # def drawAnim(self, _canvas):
-    #     window = _canvas.parentWidget()
-    #     cb_circles = window.ui.cb_circlesAnim
+        # print("Kf1:", Kf1)
+        # print("Kf2:", Kf2)
 
-    #     sizeBuffer = 1.1
-    #     leftLimit = -self.G1.Ro * sizeBuffer
-    #     rightLimit = self.CD + self.G2.Ro * sizeBuffer
-    #     topLimit = max(self.G1.Ro, self.G2.Ro) * sizeBuffer
-    #     bottomLimit = -topLimit
+        for _gear, _canvas in zip([self.G1, self.G2], [self.canvasStress1, self.canvasStress2]):
 
-    #     _canvas.axes.set_aspect('equal')
-    #     _canvas.axes.set_box_aspect(1)
-    #     _canvas.fig.tight_layout()
+            # Lewis parabola key points
+            Rd, gamma, x_Lewis, y_Lewis, a_Lewis = self.lewisParabola(_gear)
 
-    #     _canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-    #     _canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
+            # Lewis parabola dimensions
+            tt_LP = 2*x_Lewis       # tooth thickness at critical section
+            h_LP = Rd - y_Lewis     # height of Lewis parabola
 
-    #     curveCol2, circleCol2 = self.layoutGear(self.G2)
-    #     curveCol2.set_edgecolor('r')
+            stress = (w/self.mod) * cos(gamma) * (Kf1*( ((1.5*self.mod*h_LP)/ x_Lewis**2) -
+                                    (0.5*self.mod*tan(gamma))/x_Lewis ) )
 
-    #     _canvas.axes.add_collection(curveCol1)
-    #     curveCol2.set_transform(mtransforms.Affine2D().translate(self.CD, 0) + _canvas.axes.transData)
-    #     _canvas.axes.add_collection(curveCol2)
+            if _gear.ID == 1:
+                self.ui.lb_stress1.setText(str("{:.3f}".format(stress)))
+            else:
+                self.ui.lb_stress2.setText(str("{:.3f}".format(stress)))
 
-    #     if cb_circles.isChecked():
-    #         _canvas.axes.add_collection(circleCol1)
-    #         circleCol2.set_transform(mtransforms.Affine2D().translate(self.CD, 0) + _canvas.axes.transData)
-    #         _canvas.axes.add_collection(circleCol2)
+            # draw tooth
+            self.layoutStress(_gear, _canvas)
 
-    #     # animation specs
-    #     speed = 10                              # RPM
-    #     msPerRev = (60*1000)/speed              # milliseconds per revolution
-    #     interval = 33                           # ms per frame
-    #     framesPerRev = int(msPerRev / interval)	# frames for one rev
-    #     ratio = self.G1.N / self.G2.N
+            # add parabola
+            x_span = linspace(-x_Lewis*1.1, x_Lewis*1.1, 25)
+            y_span = a_Lewis*x_span**2 + Rd
 
-    #     # def animFunc(frame):
-    #     #     angle1 = (-pi/2) - (tau*frame)/framesPerRev
-    #     #     angle2 = pi/2 + pi/self.G2.N - 0.5*self.bkl/self.G2.Rs + (tau*ratio*frame)/framesPerRev
-    #     #     curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1) + _canvas.axes.transData)
-    #     #     curveCol2.set_transform(mtransforms.Affine2D().rotate((angle2)).translate(self.CD, 0) + _canvas.axes.transData)
+            paraPath = mpath.Path( list(map(list, zip(*[x_span, y_span]))) )
+            paraPatch = mpatch.PathPatch(paraPath, color='r', linestyle='--', linewidth=1, fill=False, label='Lewis Parabola')
+            _canvas.axes.add_patch(paraPatch)
 
-    #     # self.anim = manimation.FuncAnimation(_canvas.fig, animFunc, frames=framesPerRev, interval=interval)
-    #     # _canvas.draw()
-    #     return _canvas
+            # add fillet circle
+            Fx = (_gear.Rr + _gear.Rf)*sin(_gear.theta_F)   # center of fillet circle
+            Fy = (_gear.Rr + _gear.Rf)*cos(_gear.theta_F)
+            _canvas.axes.add_patch(pyplot.Circle((Fx, Fy), _gear.Rf, color='c', ls='--', fill=False))
 
+            # add intersection points
+            _canvas.axes.plot([x_Lewis], [y_Lewis], color='tab:orange', marker='o', linewidth=2)
+            _canvas.axes.plot([-x_Lewis], [y_Lewis], color='tab:orange', marker='o', linewidth=2)
 
-###############################################################################
+            # Highest point of single tooth contact
+            phi_hp = arccos(_gear.Rb/_gear.Rhp)
+            theta_hp = (_gear.tts/(2*_gear.Rs)) + invF(self.OPA) - invF(phi_hp)
+            Rhp_x = _gear.Rhp*sin(theta_hp)
+            Rhp_y = _gear.Rhp*cos(theta_hp)
+            # force vector arrow
+            arrowSlope = (Rhp_y - Rd)/Rhp_x                 # rise over run
+            tail_y = Rhp_y + (Rhp_y - Rd)*2                   # pick an arbitrary tail height
+            tail_x = (tail_y - Rhp_y)/arrowSlope + Rhp_x    # calc tail_x to match slope
+            xleft, xright = _canvas.axes.get_xlim()
+            arrowScale = (xright - xleft) * 2.5
+            arrow = mpatch.FancyArrowPatch(posA=[tail_x, tail_y], posB=[Rhp_x,Rhp_y], mutation_scale=arrowScale, color='k')
+            _canvas.axes.add_patch(arrow)
 
+            _canvas.axes.plot([Rhp_x, 0], [Rhp_y, Rd], color='k', linestyle='--', linewidth=1)
+            _canvas.axes.plot([Rhp_x], [Rhp_y], color='r', marker='*', markersize=10, linestyle='', linewidth=3)
+
+            _canvas.axes.legend(loc='upper left', framealpha=1.0)
+            _canvas.draw()
+
+    def lewisParabola(self, _gear):
+        """
+        # Find the intersection point of the Lewis parabola and the root fillet circle
+        #
+        # Parameters:
+        # Fx, Fy - centerpoint of root fillet circle
+        # Rf - root fillet radius
+        # Rd - intersection of tooth centerline and force vector; the top of the Lewis
+        #   parabola
+        #
+        # Output variables:
+        # x, y - point of intersection between the Lewis parabola and the root fillet
+        # a - scale of parabola, => y = ax^2 + bx + c
+        #-------------------------------------------------------------------------------
+
+        # Equation of a circle: (y-v)^2 + (x-h)^2 = r^2
+        # Substitute values for fillet circle: (y-Fy)^2 + (x-Fx)^2 = Rf^2
+        # Rearrange: y = +/-sqrt(Rf^2 - (x-Fx)^2) + Fy
+        # We are only interested in the bottom half of the circle:
+        # [1] y = -sqrt(Rf^2 - (x-Fx)^2) + Fy
+        # Implicit differentiation of [1]:
+        # [2] dy/dx = -(x-Fx)/(y-Fy)
+        #
+        # Equation of a parabola: y = ax^2 + bx + c
+        # Substitute values of Lewis parabola, and note that the parabola is
+        # centered on the y-axis, i.e. b=0:
+        # [3] y = ax^2 + Rd
+        # Differentiate [3]:
+        # [4] dy/dx = 2ax
+        #
+        # At the tangent intersection of the parabola and circle, the derivatives
+        # are equal:
+        # [5] -(x-Fx)/(y-Fy) = 2ax
+        # Rearrange [5]:
+        # [6] a = -(x-Fx)/(2x)(y-Fy)
+        # Substitute [6] into [3]:
+        # y = -(x)(x-Fx)/(2)(y-Fy) + Rd
+        # y^2 - Fy*y - Rd*y = (-x^2 + Fx*x)/2 - Rd*Fy
+        # Complete the square:
+        # [y^2 -(Fy+Rd)*y + (Fy+Rd)^2/4] - (Fy+Rd)^2/4 = (-x^2 + Fx*x)/2 - Rd*Fy
+        # [y - (Fy+Rd)/2]^2  = (-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4
+        # y - (Fy+Rd)/2 = +/-sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4]
+        # [7] y = +/-sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2
+        # We are only interested in the bottom half of the circle:
+        # [8] y = -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2
+        # Eq [8] must intersect Eq [1]:
+        # -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2 = -sqrt(Rf^2 - (x-Fx)^2) + Fy
+        # Rearrange to find the zero:
+        # [9] -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2 +
+        #   sqrt(Rf^2 - (x-Fx)^2) - Fy = 0
+        """
+
+        # Highest point of single tooth contact
+        phi_hp = arccos(_gear.Rb/_gear.Rhp)
+        theta_hp = (_gear.tts/(2*_gear.Rs)) + invF(self.OPA) - invF(phi_hp)
+        Rhp_x = _gear.Rhp*sin(theta_hp)
+        Rhp_y = _gear.Rhp*cos(theta_hp)
+
+        # angle between force normal direction and
+        # perpendicular to tooth centerline
+        gamma = phi_hp - theta_hp
+
+        # top of Lewis parabola
+        Rd = _gear.Rb / cos(phi_hp - theta_hp)
+
+        # find center of fillet circle
+        Fx = (_gear.Rr + _gear.Rf)*sin(_gear.theta_F)
+        Fy = (_gear.Rr + _gear.Rf)*cos(_gear.theta_F)
+
+        if _gear.Rf == 0:
+            x = Fx
+            y = Fy
+            a = (y-Rd)/(x**2)
+        else:
+
+            # Eq [9] above
+            def func(x):
+                return real(-sqrt( (-(x**2) + Fx*x)/2 - Rd*Fy + ((Fy+Rd)**2)/4) + (Fy+Rd)/2 +
+                        sqrt(_gear.Rf**2 - (x-Fx)**2) - Fy)
+
+            # starting point is between the JFI and fillet center
+            initialGuess = Fx - _gear.Rf/2
+
+            sol = least_squares(func, x0=initialGuess)
+            # print(sol.values())
+            x = sol.x.item()
+            y = -sqrt(_gear.Rf**2 - (x-Fx)**2) + Fy 	# Eq [1] above
+            a = (y-Rd)/(x**2)                               # Eq [3] above
+
+        # print("Fx:", Fx)
+        # print("Fy:", Fy)
+        # print("x:", x)
+        # print("y:", y)
+        # print("a:", a)
+
+        return [Rd, gamma, x, y, a]
+
+# Main ########################################################################
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     widget = jpgearqt()

@@ -50,7 +50,7 @@ class Ui_Popup(object):
 
         self.cb_circlesAnim = QCheckBox(Popup)
         self.cb_circlesAnim.setObjectName(u"cb_circlesAnim")
-        self.cb_circlesAnim.setChecked(True)
+        self.cb_circlesAnim.setChecked(False)
 
         self.hLayout_toolbarAnim.addWidget(self.cb_circlesAnim)
 
