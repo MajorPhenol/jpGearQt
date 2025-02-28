@@ -1,8 +1,12 @@
 # This Python file uses the following encoding: utf-8
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QStyle, QMenuBar, QMenu, QFileDialog
-from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction
+
+from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QMenuBar, QMenu
+from PySide6.QtWidgets import QFileDialog, QDialog, QDialogButtonBox, QMessageBox
+
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction
 
 # Important:
 # You need to run the following command to generate the ui_form.py file
@@ -30,6 +34,7 @@ import matplotlib.animation as manimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 import copy
+import json
 
 import ezdxf
 from ezdxf.math import UCS
@@ -103,7 +108,7 @@ class Gear():
         self.Rtip_max = 0 			# max possible tip radius
         self.Roe = 0    			# effective outer radius, considering tip radius
 
-        self.Rr = -1                             # root radius
+        self.Rr = -1                            # root radius
         self.Rf = 0				# root fillet radius
         self.Rff = 0				# root full fillet radius
         self.theta_F = 0			# angle between tooth centerline and root fillet center
@@ -111,9 +116,12 @@ class Gear():
 
         self.Rhp = 0				# highest point of single tooth contact
 
-        self.FW = 1				# face width
-
         self.undercut = False
+
+        self.FW = 1				# face width
+        self.E = 200000                         # Young's modulus
+        self.nu = 0.3                           # Poisson's ratio
+
 
 class popupWindow(QWidget):
     def __init__(self, _jpgearqt):
@@ -156,7 +164,9 @@ class jpgearqt(QWidget):
         self.good_pixmap = QPixmap("resources/icon_good.png")
         self.bad_pixmap = QPixmap("resources/icon_bad.png")
 
+        self.createMenu()
         self.connectUI()
+        self.setupShortcuts()
         self.setupCanvases()
 
         # gear objects
@@ -174,25 +184,63 @@ class jpgearqt(QWidget):
         self.rtcl2 = 0
         self.CD = 0                     # center distance
         self.CR = 0                     # contact ratio
+        self.speed = 1                    # pinion speed
+        self.torque = 1                 # pinion torque
+
+        self.savePath = ''              # for saving JSON
 
         self.initGearDesignFields()
 
 # Setup #######################################################################
-    def connectUI(self):
-        # menu bar
+    def createMenu(self):
+        # create menu bar
         menuBar = QMenuBar(self)
 
+        # File Menu
         menuFile = menuBar.addMenu('&File')
-        actSave = menuFile.addAction('Save DXF')
+
+        actOpen = menuFile.addAction('Open')
+        actOpen.setShortcut(QKeySequence("Ctrl+O"))
+        actOpen.triggered.connect(lambda: self.openJSON())
+
+        actSave = menuFile.addAction('Save')
         actSave.setShortcut(QKeySequence("Ctrl+S"))
-        actSave.triggered.connect(lambda: self.saveDXF())
+        actSave.triggered.connect(lambda: self.saveJSON(self.savePath))
 
-        menuHelp = QMenu('&Help')
-        menuHelp.addAction('Help Menu')
+        actSaveAs = menuFile.addAction('Save As')
+        actSaveAs.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        actSaveAs.triggered.connect(lambda: self.saveAsJSON())
 
-        menuBar.addMenu(menuHelp)
+        actExportDXF = menuFile.addAction('Export DXF')
+        actExportDXF.triggered.connect(lambda: self.exportDXF())
+
+        menuFile.addSeparator()
+
+        actExit = menuFile.addAction('Exit')
+        actExit.setShortcut(QKeySequence("Ctrl+Q"))
+        actExit.triggered.connect(lambda: sys.exit())
+
+        # Help Menu
+        menuHelp = menuBar.addMenu('&Help')
+        actHelp = menuHelp.addAction('Help Menu')
+        # actHelp.triggered.connect(lambda: )
+
+        # add menu to ui
         self.ui.topLayout.insertWidget(0, menuBar)
 
+    def setupShortcuts(self):
+        # cycle tabs
+        self.SC_cycleTabFW = QShortcut(QKeySequence("PgDown"), self)
+        self.SC_cycleTabFW.activated.connect(lambda: self.cycleTab(dir='forward'))
+        self.SC_cycleTabRV = QShortcut(QKeySequence("PgUp"), self)
+        self.SC_cycleTabRV.activated.connect(lambda: self.cycleTab(dir='backward'))
+        # draw gears
+        self.SC_drawGear = QShortcut(QKeySequence("Ctrl+D"), self)
+        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: self.drawMesh(_updateAxes=True))
+
+    def connectUI(self):
         # First tab
         self.ui.pb_calcGearSizes.clicked.connect(lambda: self.findGearSizes())
         self.ui.le_pN.editingFinished.connect(lambda: self.updatePinionN())
@@ -223,8 +271,8 @@ class jpgearqt(QWidget):
         self.ui.le_Rtip1.editingFinished.connect(lambda: self.set_Rtip(self.G1, self.ui.le_Rtip1.text()))
         self.ui.le_Rtip2.editingFinished.connect(lambda: self.set_Rtip(self.G2, self.ui.le_Rtip2.text()))
 
-        self.ui.le_rtcl1.editingFinished.connect(lambda: self.set_rtcl(self.G1, self.ui.le_rtcl1.text()))
-        self.ui.le_rtcl2.editingFinished.connect(lambda: self.set_rtcl(self.G2, self.ui.le_rtcl2.text()))
+        self.ui.le_rtcl1.editingFinished.connect(lambda: self.set_rtcl(1, self.ui.le_rtcl1.text()))
+        self.ui.le_rtcl2.editingFinished.connect(lambda: self.set_rtcl(2, self.ui.le_rtcl2.text()))
 
         self.ui.le_Rf1.editingFinished.connect(lambda: self.set_Rf(self.G1, self.ui.le_Rf1.text()))
         self.ui.le_Rf2.editingFinished.connect(lambda: self.set_Rf(self.G2, self.ui.le_Rf2.text()))
@@ -251,20 +299,17 @@ class jpgearqt(QWidget):
         # animate button
         self.ui.pb_animate.clicked.connect(lambda: self.createAnimWindow())
 
+        # Stress tab
+        self.ui.le_speed.editingFinished.connect(lambda: self.set_speed(self.ui.le_speed.text()))
+        self.ui.le_torque.editingFinished.connect(lambda: self.set_torque(self.ui.le_torque.text()))
+        self.ui.le_E1.editingFinished.connect(lambda: self.set_E(self.G1, self.ui.le_E1.text()))
+        self.ui.le_E2.editingFinished.connect(lambda: self.set_E(self.G2, self.ui.le_E2.text()))
+        self.ui.le_nu1.editingFinished.connect(lambda: self.set_nu(self.G1, self.ui.le_nu1.text()))
+        self.ui.le_nu2.editingFinished.connect(lambda: self.set_nu(self.G2, self.ui.le_nu2.text()))
+
         # stress button
         self.ui.pb_stress.clicked.connect(lambda: self.updateStress())
 
-        # shortcuts ###
-        # cycle tabs
-        self.SC_cycleTabFW = QShortcut(QKeySequence("PgDown"), self)
-        self.SC_cycleTabFW.activated.connect(lambda: self.cycleTab(dir='forward'))
-        self.SC_cycleTabRV = QShortcut(QKeySequence("PgUp"), self)
-        self.SC_cycleTabRV.activated.connect(lambda: self.cycleTab(dir='backward'))
-        # draw gears
-        self.SC_drawGear = QShortcut(QKeySequence("Ctrl+D"), self)
-        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
-        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
-        self.SC_drawGear.activated.connect(lambda: self.drawMesh(_updateAxes=True))
 
     def swapBklandCD(self):
         # input backlash
@@ -340,32 +385,167 @@ class jpgearqt(QWidget):
         stress_layout2.insertWidget(1, toolbarStress2)
 
     def initGearDesignFields(self):
-        self.ui.le_PA_deg.setText(str("{:.0f}".format((self.PA_deg))))
-        self.ui.le_CD_bkl.setText(str("{:.0f}".format(self.bkl)))
-        self.ui.le_rtcl1.setText(str("{:.0f}".format(self.rtcl1)))
-        self.ui.le_rtcl2.setText(str("{:.0f}".format(self.rtcl2)))
-        self.ui.le_x1.setText(str("{:.0f}".format(self.G1.x)))
-        self.ui.le_x2.setText(str("{:.0f}".format(self.G2.x)))
-        self.ui.le_Rtip1.setText(str("{:.0f}".format(self.G1.Rtip)))
-        self.ui.le_Rtip2.setText(str("{:.0f}".format(self.G2.Rtip)))
-        self.ui.le_Rf1.setText(str("{:.0f}".format(self.G1.Rf)))
-        self.ui.le_Rf2.setText(str("{:.0f}".format(self.G2.Rf)))
-        self.ui.le_FW1.setText(str("{:.0f}".format(self.G1.FW)))
-        self.ui.le_FW2.setText(str("{:.0f}".format(self.G2.FW)))
+        # gear design tab
+        if self.mod > 0:
+            self.ui.le_mod.setText(str("{:.2f}".format((self.mod))))
 
-        self.ui.lb_bkl_text.hide()
-        self.ui.lb_bkl_units.hide()
-        self.ui.lb_bkl_value.hide()
+        self.ui.le_PA_deg.setText(str("{:.1f}".format((self.PA_deg))))
 
+        if self.ui.cb_CD_bkl.currentIndex() == 0:
+            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.bkl)))
+            self.ui.lb_CD_text.hide()
+            self.ui.lb_CD_units.hide()
+            self.ui.lb_CD_value.hide()
+        else:
+            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.CD)))
+            self.ui.lb_bkl_text.hide()
+            self.ui.lb_bkl_units.hide()
+            self.ui.lb_bkl_value.hide()
+
+        self.ui.le_rtcl1.setText(str("{:.3f}".format(self.rtcl1)))
+        self.ui.le_rtcl2.setText(str("{:.3f}".format(self.rtcl2)))
+
+        if self.G1.N > 0:
+            self.ui.le_N1.setText(str(self.G1.N))
+        if self.G2.N > 0:
+            self.ui.le_N2.setText(str(self.G2.N))
+
+        self.ui.le_x1.setText(str("{:.3f}".format(self.G1.x)))
+        self.ui.le_x2.setText(str("{:.3f}".format(self.G2.x)))
+
+        if self.G1.Ro > 0:
+            self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
+        if self.G2.Ro > 0:
+            self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
+
+        self.ui.le_Rtip1.setText(str("{:.3f}".format(self.G1.Rtip)))
+        self.ui.le_Rtip2.setText(str("{:.3f}".format(self.G2.Rtip)))
+        self.ui.le_Rf1.setText(str("{:.3f}".format(self.G1.Rf)))
+        self.ui.le_Rf2.setText(str("{:.3f}".format(self.G2.Rf)))
+        self.ui.le_FW1.setText(str("{:.3f}".format(self.G1.FW)))
+        self.ui.le_FW2.setText(str("{:.3f}".format(self.G2.FW)))
+        self.ui.le_E1.setText(str("{:.3f}".format(self.G1.E)))
+        self.ui.le_E2.setText(str("{:.3f}".format(self.G2.E)))
+        self.ui.le_nu1.setText(str("{:.3f}".format(self.G1.nu)))
+        self.ui.le_nu2.setText(str("{:.3f}".format(self.G2.nu)))
+
+        # mesh slider
         self.sliderScale = 100    # the slider can only handle ints, show scale up everthing
         self.ui.hSlider_Mesh.setMinimum(0)
         self.ui.hSlider_Mesh.setMaximum(2*self.sliderScale)
         self.ui.hSlider_Mesh.setSliderPosition(1*self.sliderScale)    # pitch point happens at slider = 1
 
-    def saveDXF(self):
-        self.layoutGear(self.G1, save=True)
-        self.layoutGear(self.G2, save=True)
+        # stress tab
+        self.ui.le_FW1.setText(str("{:.0f}".format(self.G1.FW)))
+        self.ui.le_FW2.setText(str("{:.0f}".format(self.G2.FW)))
+        self.ui.le_E1.setText(str("{:.0f}".format(self.G1.E)))
+        self.ui.le_E2.setText(str("{:.0f}".format(self.G2.E)))
+        self.ui.le_nu1.setText(str("{:.2f}".format(self.G1.nu)))
+        self.ui.le_nu2.setText(str("{:.2f}".format(self.G2.nu)))
+        self.ui.le_speed.setText(str("{:.0f}".format(self.speed)))
+        self.ui.le_torque.setText(str("{:.0f}".format(self.torque)))
 
+    def exportDXF(self):
+        for gear in [self.G1, self.G2]:
+            if gear.Rb < 0 :
+                messageBox = QMessageBox.critical(self, "Error exporting", "Could not export geometry for gear "+str(gear.ID))
+            else:
+                self.layoutGear(gear, save=True)
+
+
+    def openJSON(self):
+        loadPath, selectedFilter = QFileDialog.getOpenFileName(self, 'Load Design')
+
+        if loadPath == '':
+            return
+        else:
+            with open(loadPath, 'r', encoding='utf-8') as f:
+                dictFull = json.load(f)
+
+            dictG1 = dictFull["Gear1"]
+            dictG2 = dictFull["Gear2"]
+            dictM = dictFull["Mesh"]
+
+            # set mesh parameters
+            self.set_mod(dictM["mod"])
+            self.set_PA_deg(dictM["PA_deg"])
+
+            if dictM["set_CD_bkl"] == 0:
+                # use backlash
+                self.ui.cb_CD_bkl.setCurrentIndex(0)
+                self.set_bkl(dictM["bkl"])
+            else:
+                # use center distance
+                self.ui.cb_CD_bkl.setCurrentIndex(1)
+                self.set_CD(dictM["CD"])
+
+            self.set_rtcl(1, dictM["rtcl1"])
+            self.set_rtcl(2, dictM["rtcl2"])
+
+            self.set_speed(dictM["speed"])
+            self.set_torque(dictM["torque"])
+
+            # set gear parameters
+            for gear, dict in zip([self.G1, self.G2], [dictG1, dictG2]):
+                self.set_N(gear, dict["N"])
+                self.set_x(gear, dict["x"])
+                self.set_Ro(gear, dict["Ro"])
+                self.set_Rtip(gear, dict["Rtip"])
+            # split it up so that both N's are set before Rf
+            for gear, dict in zip([self.G1, self.G2], [dictG1, dictG2]):
+                self.set_Rf(gear, dict["Rf"])
+                self.set_FW(gear, dict["FW"])
+                self.set_E(gear, dict["E"])
+                self.set_nu(gear, dict["nu"])
+
+            self.initGearDesignFields()
+
+    def saveAsJSON(self):
+        defaultName = 'gear_design.json'
+        savePath, selectedFilter = QFileDialog.getSaveFileName(self, 'Save Design', defaultName)
+
+        if savePath == '':
+            return
+        else:
+            self.savePath = savePath
+            self.saveJSON(self.savePath)
+
+    def saveJSON(self, _path):
+        if self.savePath == '':
+            self.saveAsJSON()
+        else:
+            dictFull = {
+                        "Gear1" : self.createJSONGear(self.G1),
+                        "Gear2" : self.createJSONGear(self.G2),
+                        "Mesh" : self.createJSONMesh()
+                    }
+
+            with open(_path, 'w', encoding='utf-8') as f:
+                json.dump(dictFull, f, ensure_ascii=False, indent=4)
+
+    def createJSONGear(self, _gear):
+        return {
+            "N" : _gear.N,
+            "x" : _gear.x,
+            "Ro" : _gear.Ro,
+            "Rtip" : _gear.Rtip,
+            "Rf" : _gear.Rf,
+            "FW" : _gear.FW,
+            "E" : _gear.E,
+            "nu" : _gear.nu,
+        }
+    def createJSONMesh(self):
+        return {
+            "mod" : self.mod,
+            "PA_deg" : self.PA_deg,
+            "set_CD_bkl" : self.ui.cb_CD_bkl.currentIndex(),
+            "bkl" : self.bkl,
+            "CD" : self.CD,
+            "rtcl1" : self.rtcl1,
+            "rtcl2" : self.rtcl2,
+            "speed" : self.speed,
+            "torque" : self.torque
+        }
 # Helper Tab ##################################################################
     def findGearSizes(self):
         type = self.ui.cb_CD_width.currentIndex()
@@ -676,13 +856,14 @@ class jpgearqt(QWidget):
             self.updateRoe(_gear)
 
 
-    def set_rtcl(self, _gear, _rtcl):
+    def set_rtcl(self, n, _rtcl):
         if is_number(_rtcl):
-            if _gear.ID == 1:
+            if n == 1:
                 self.rtcl1 = float(_rtcl)
+                self.updateRootRadius(self.G1)
             else:
                 self.rtcl2 = float(_rtcl)
-            self.updateRootRadius(_gear)
+                self.updateRootRadius(self.G2)
 
     def set_Rf(self, _gear, _Rf):
         if is_number(_Rf):
@@ -700,6 +881,7 @@ class jpgearqt(QWidget):
     def set_FW(self, _gear, _FW):
         if is_number(_FW):
             _gear.FW = float(_FW)
+
 
     def updateBklandCD(self):
         # backlash
@@ -1260,11 +1442,8 @@ class jpgearqt(QWidget):
 
         if save == True:
             if G.ID == 1:
-                caption = 'Save Gear 1'
                 defaultName = 'gear1.dxf'
-
             else:
-                caption = 'Save Gear 2'
                 defaultName = 'gear2.dxf'
 
             savePath, selectedFilter = QFileDialog.getSaveFileName(self, 'Save Gear'+str(G.ID), defaultName)
@@ -1554,14 +1733,14 @@ class jpgearqt(QWidget):
         if self.ui.cb_LoC.isChecked():
             # line of contact
             canvas.axes.plot([x1,x2],[y1,y2], color='k', marker='x', linestyle='--', linewidth=1)
-            canvas.axes.plot([x3,x4],[y3,y4], color='k', marker='x', linewidth=2)
+            loc, = canvas.axes.plot([x3,x4],[y3,y4], color='k', marker='x', linewidth=2, label='Line of Contact')
             # contact point
             traceAngle = self.OPA - phi_A
             R = self.G1.Rb/cos(phi_A)
             traceX = R*cos(traceAngle)
             traceY = R*sin(traceAngle)
             tracePoint, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
-            legendPoint = canvas.axes.legend(handles=[tracePoint], loc='lower left', framealpha=1.0)
+            legendPoint = canvas.axes.legend(handles=[loc, tracePoint], loc='lower left', framealpha=1.0)
             canvas.axes.add_artist(legendPoint)
 
         canvas.draw()
@@ -1624,6 +1803,22 @@ class jpgearqt(QWidget):
         window.show()
 
 # Stress ######################################################################
+    def set_speed(self, _speed):
+        if is_number(_speed):
+            self.speed = float(_speed)
+
+    def set_torque(self, _torque):
+        if is_number(_torque):
+            self.torque = float(_torque)
+
+    def set_E(self, _gear, _E):
+        if is_number(_E):
+            _gear.E = float(_E)
+
+    def set_nu(self, _gear, _nu):
+        if is_number(_nu):
+            _gear.nu = float(_nu)
+
     def updateStress(self):
         if self.G1.N < 1 or self.G2.N < 1:
             return
@@ -1634,8 +1829,7 @@ class jpgearqt(QWidget):
         FW = min(self.G1.FW, self.G2.FW)
 
         # convert torque to force through HPSTC tangent to base circle
-        torque = float(self.ui.le_torque.text())
-        w = torque / (self.G1.Rb * FW)
+        w = self.torque / (self.G1.Rb * FW)
 
         self.calcContactStress(w)
         self.calcBendingStress(w)

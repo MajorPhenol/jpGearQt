@@ -2705,7 +2705,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>200000</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -2737,7 +2737,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>1</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -2814,7 +2814,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>1</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3023,7 +3023,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>200000</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3060,7 +3060,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>1</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3118,7 +3118,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>1</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3179,7 +3179,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>0.3</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
@@ -3195,7 +3195,7 @@
               </sizepolicy>
              </property>
              <property name="text">
-              <string>0.3</string>
+              <string/>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
