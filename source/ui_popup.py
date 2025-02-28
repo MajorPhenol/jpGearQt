@@ -15,8 +15,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QSizePolicy,
-    QSlider, QSpacerItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QLabel,
+    QSizePolicy, QSlider, QSpacerItem, QVBoxLayout,
+    QWidget)
 
 class Ui_Popup(object):
     def setupUi(self, Popup):
@@ -25,6 +26,18 @@ class Ui_Popup(object):
         Popup.resize(800, 600)
         self.vLayout_popup = QVBoxLayout(Popup)
         self.vLayout_popup.setObjectName(u"vLayout_popup")
+        self.horizontalLayout = QHBoxLayout()
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.label = QLabel(Popup)
+        self.label.setObjectName(u"label")
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
+        self.label.setSizePolicy(sizePolicy)
+
+        self.horizontalLayout.addWidget(self.label)
+
         self.hSlider_Speed = QSlider(Popup)
         self.hSlider_Speed.setObjectName(u"hSlider_Speed")
         self.hSlider_Speed.setMinimum(-20)
@@ -33,9 +46,12 @@ class Ui_Popup(object):
         self.hSlider_Speed.setSliderPosition(10)
         self.hSlider_Speed.setOrientation(Qt.Orientation.Horizontal)
         self.hSlider_Speed.setTickPosition(QSlider.TickPosition.TicksBothSides)
-        self.hSlider_Speed.setTickInterval(100)
+        self.hSlider_Speed.setTickInterval(20)
 
-        self.vLayout_popup.addWidget(self.hSlider_Speed)
+        self.horizontalLayout.addWidget(self.hSlider_Speed)
+
+
+        self.vLayout_popup.addLayout(self.horizontalLayout)
 
         self.hLayout_toolbarAnim = QHBoxLayout()
         self.hLayout_toolbarAnim.setObjectName(u"hLayout_toolbarAnim")
@@ -65,6 +81,7 @@ class Ui_Popup(object):
 
     def retranslateUi(self, Popup):
         Popup.setWindowTitle(QCoreApplication.translate("Popup", u"Form", None))
+        self.label.setText(QCoreApplication.translate("Popup", u"Speed", None))
         self.cb_singleViewAnim.setText(QCoreApplication.translate("Popup", u"Mesh View", None))
         self.cb_circlesAnim.setText(QCoreApplication.translate("Popup", u"Show Circles", None))
     # retranslateUi
