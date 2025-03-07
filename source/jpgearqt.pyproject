@@ -2,6 +2,7 @@
     "files": [
         "jpgearqt.py",
         "form.ui",
-        "popup.ui"
+        "popup.ui",
+        "Gear.py"
     ]
 }

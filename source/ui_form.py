@@ -27,7 +27,7 @@ class Ui_jpgearqt(object):
         if not jpgearqt.objectName():
             jpgearqt.setObjectName(u"jpgearqt")
         jpgearqt.setWindowModality(Qt.WindowModality.NonModal)
-        jpgearqt.resize(1212, 741)
+        jpgearqt.resize(1200, 800)
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -1740,7 +1740,7 @@ class Ui_jpgearqt(object):
 
         self.retranslateUi(jpgearqt)
 
-        self.tabW_main.setCurrentIndex(1)
+        self.tabW_main.setCurrentIndex(0)
         self.cb_CD_bkl.setCurrentIndex(0)
         self.tabW_GD.setCurrentIndex(2)
         self.tabWidget.setCurrentIndex(0)

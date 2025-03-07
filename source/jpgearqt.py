@@ -1,5 +1,15 @@
-# This Python file uses the following encoding: utf-8
+# Options for nuitka compilation:
+# nuitka-project: --enable-plugin=pyside6
+# nuitka-project: --onefile
+# nuitka-project: --include-data-dir={MAIN_DIRECTORY}/resources=resources
+# nuitka-project: --output-dir={MAIN_DIRECTORY}/../dist/{OS}/{Arch}
+# nuitka-project: --remove-output
+# nuitka-project-if: {OS} in ("Windows"):
+#   nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/splash.png
+## nuitka-project: --deployment
+
 import sys
+import os
 
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PySide6.QtWidgets import QMenuBar, QMenu
@@ -8,14 +18,11 @@ from PySide6.QtWidgets import QFileDialog, QDialog, QDialogButtonBox, QMessageBo
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction
 
-# Important:
-# You need to run the following command to generate the ui_form.py file
-#     pyside6-uic form.ui -o ui_form.py, or
-#     pyside2-uic form.ui -o ui_form.py
 from ui_form import Ui_jpgearqt
 from ui_popup import Ui_Popup
 
 ###############################################################################
+from Gear import Gear
 
 import numpy as np
 from numpy import pi, sin, cos, tan, arcsin, arccos, arctan
@@ -78,50 +85,22 @@ def revInvF(angle):
     return arccos(1/x)
 
 ###############################################################################
+# Use this code to signal the splash screen removal.
+# if "NUITKA_ONEFILE_PARENT" in os.environ:
+#    splash_filename = os.path.join(
+#       tempfile.gettempdir(),
+#       "onefile_%d_splash_feedback.tmp" % int(os.environ["NUITKA_ONEFILE_PARENT"]),
+#    )
 
+#    if os.path.exists(splash_filename):
+#       os.unlink(splash_filename)
+
+###############################################################################
 class MplCanvas(FigureCanvasQTAgg):
     def __init__(self, parent=None, _width=5, _height=4, _dpi=100):
         self.fig = Figure(figsize=(_width, _height), dpi=_dpi)
         self.axes = self.fig.add_subplot()
         super().__init__(self.fig)
-
-class Gear():
-    def __init__(self, _ID):
-        self.ID = _ID
-
-        self.N = -1                             # teeth
-
-        self.x = 0				# profile shift
-        self.tts = -1            		# standard tooth thickness
-                                                # Note - this will get updated for any profile shift
-        self.tt = -1    			# tooth thickness at effective pitch radius
-
-        self.Rs = -1                            # standard pitch radius
-        self.Rp = -1             		# pitch radius at OPA
-        self.Rb = -1                            # base circle radius
-        self.Pb = -1                     	# base pitch
-
-        self.Ros = -1                    	# standard outer radius
-        self.Ro = -1     			# actual outer radius
-        self.Romax = -1     			# max outer radius, i.e. sharp
-        self.Rtip = 0				# tip radius
-        self.Rtip_max = 0 			# max possible tip radius
-        self.Roe = 0    			# effective outer radius, considering tip radius
-
-        self.Rr = -1                            # root radius
-        self.Rf = 0				# root fillet radius
-        self.Rff = 0				# root full fillet radius
-        self.theta_F = 0			# angle between tooth centerline and root fillet center
-        self.phi_JFI = 0			# profile angle at the junction of root fillet and involute, radians
-
-        self.Rhp = 0				# highest point of single tooth contact
-
-        self.undercut = False
-
-        self.FW = 1				# face width
-        self.E = 200000                         # Young's modulus
-        self.nu = 0.3                           # Poisson's ratio
-
 
 class popupWindow(QWidget):
     def __init__(self, _jpgearqt):
@@ -134,7 +113,7 @@ class popupWindow(QWidget):
 
     def connectUI(self):
         self.ui.cb_circlesAnim.checkStateChanged.connect(lambda: self.updateCircles())
-        # self.ui.cb_singleViewAnim.checkStateChanged.connect(lambda: )
+        self.ui.cb_singleViewAnim.checkStateChanged.connect(lambda: self.updateAnimAxes())
 
     def updateCircles(self):
         if self.ui.cb_circlesAnim.isChecked():
@@ -154,15 +133,36 @@ class popupWindow(QWidget):
                 if collection.get_label() == 'circleCol1' or collection.get_label() == 'circleCol2':
                     collection.remove()
 
+    def updateAnimAxes(self):
+        canvas = self.canvas
+
+        # tight view
+        if self.ui.cb_singleViewAnim.isChecked():
+            topLimit = self.jpgearqt.G1.Rp*sin(tau/self.jpgearqt.G1.N)
+            bottomLimit = -topLimit
+            leftLimit = self.jpgearqt.G1.Rp - topLimit
+            rightLimit = self.jpgearqt.G1.Rp + topLimit
+        # full view
+        else:
+            sizeBuffer = 1.1
+            leftLimit = -self.jpgearqt.G1.Ro * sizeBuffer
+            rightLimit = self.jpgearqt.CD + self.jpgearqt.G2.Ro * sizeBuffer
+            topLimit = max(self.jpgearqt.G1.Ro, self.jpgearqt.G2.Ro) * sizeBuffer
+            bottomLimit = -topLimit
+
+        canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
+        canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
+
 class jpgearqt(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__), "resources/icon_main.png")))
         self.ui = Ui_jpgearqt()
         self.ui.setupUi(self)
 
         # import icons
-        self.good_pixmap = QPixmap("resources/icon_good.png")
-        self.bad_pixmap = QPixmap("resources/icon_bad.png")
+        self.good_pixmap = QPixmap(os.path.join(os.path.dirname(__file__), "resources/icon_good.png"))
+        self.bad_pixmap = QPixmap(os.path.join(os.path.dirname(__file__), "resources/icon_bad.png"))
 
         self.createMenu()
         self.connectUI()
@@ -1744,7 +1744,6 @@ class jpgearqt(QWidget):
             canvas.axes.add_artist(legendPoint)
 
         canvas.draw()
-
 
     def createAnimWindow(self):
         if self.G1.Rb < 0 or self.G2.Rb < 0:
