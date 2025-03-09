@@ -5,11 +5,13 @@
 # nuitka-project: --output-dir={MAIN_DIRECTORY}/../dist/{OS}/{Arch}
 # nuitka-project: --remove-output
 # nuitka-project-if: {OS} in ("Windows"):
+#   nuitka-project: --msvc=latest
 #   nuitka-project: --onefile-windows-splash-screen-image={MAIN_DIRECTORY}/splash.png
-## nuitka-project: --deployment
+#   nuitka-project: --windows-icon-from-ico={MAIN_DIRECTORY}/resources/icon_main.png
+# nuitka-project: --deployment
 
 import sys
-import os
+import os, tempfile
 
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PySide6.QtWidgets import QMenuBar, QMenu
@@ -86,14 +88,14 @@ def revInvF(angle):
 
 ###############################################################################
 # Use this code to signal the splash screen removal.
-# if "NUITKA_ONEFILE_PARENT" in os.environ:
-#    splash_filename = os.path.join(
-#       tempfile.gettempdir(),
-#       "onefile_%d_splash_feedback.tmp" % int(os.environ["NUITKA_ONEFILE_PARENT"]),
-#    )
+if "NUITKA_ONEFILE_PARENT" in os.environ:
+   splash_filename = os.path.join(
+      tempfile.gettempdir(),
+      "onefile_%d_splash_feedback.tmp" % int(os.environ["NUITKA_ONEFILE_PARENT"]),
+   )
 
-#    if os.path.exists(splash_filename):
-#       os.unlink(splash_filename)
+   if os.path.exists(splash_filename):
+      os.unlink(splash_filename)
 
 ###############################################################################
 class MplCanvas(FigureCanvasQTAgg):
