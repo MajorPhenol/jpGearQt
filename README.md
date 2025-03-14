@@ -105,10 +105,21 @@ Backlash is the clearance on the backside of the gear teeth.  Some backlash in n
 
 #### Profile Shift Coefficient
 
+![Profile Shift](img/x.png)
+
+
 #### Outer Radius
+
+![Outer Radius](img/Ro.png)
 
 #### Tip Fillet
 
+![Tip Fillet](img/Rtip.png)
+
 #### Root Clearance
 
+![Root Clearance](img/Rr.png)
+
 #### Root Fillet
+
+![Root Fillet](img/Rf.png)

@@ -184,7 +184,7 @@ class jpgearqt(QWidget):
         self.bkl = 0                    # backlash
         self.rtcl1 = 0                  # root clearances
         self.rtcl2 = 0
-        self.CD = 0                     # center distance
+        self.CD = -1                    # center distance
         self.CR = 0                     # contact ratio
         self.speed = 1                    # pinion speed
         self.torque = 1                 # pinion torque
@@ -223,8 +223,8 @@ class jpgearqt(QWidget):
         actExit.triggered.connect(lambda: sys.exit())
 
         # Help Menu
-        menuHelp = menuBar.addMenu('&Help')
-        actHelp = menuHelp.addAction('Help Menu')
+        # menuHelp = menuBar.addMenu('&Help')
+        # actHelp = menuHelp.addAction('Help Menu')
         # actHelp.triggered.connect(lambda: )
 
         # add menu to ui
@@ -273,8 +273,8 @@ class jpgearqt(QWidget):
         self.ui.le_Rtip1.editingFinished.connect(lambda: self.set_Rtip(self.G1, self.ui.le_Rtip1.text()))
         self.ui.le_Rtip2.editingFinished.connect(lambda: self.set_Rtip(self.G2, self.ui.le_Rtip2.text()))
 
-        self.ui.le_rtcl1.editingFinished.connect(lambda: self.set_rtcl(1, self.ui.le_rtcl1.text()))
-        self.ui.le_rtcl2.editingFinished.connect(lambda: self.set_rtcl(2, self.ui.le_rtcl2.text()))
+        self.ui.le_rtcl1.editingFinished.connect(lambda: self.set_rtcl(self.G1, self.ui.le_rtcl1.text()))
+        self.ui.le_rtcl2.editingFinished.connect(lambda: self.set_rtcl(self.G2, self.ui.le_rtcl2.text()))
 
         self.ui.le_Rf1.editingFinished.connect(lambda: self.set_Rf(self.G1, self.ui.le_Rf1.text()))
         self.ui.le_Rf2.editingFinished.connect(lambda: self.set_Rf(self.G2, self.ui.le_Rf2.text()))
@@ -481,8 +481,8 @@ class jpgearqt(QWidget):
                 self.ui.cb_CD_bkl.setCurrentIndex(1)
                 self.set_CD(dictM["CD"])
 
-            self.set_rtcl(1, dictM["rtcl1"])
-            self.set_rtcl(2, dictM["rtcl2"])
+            self.set_rtcl(self.G1, dictM["rtcl1"])
+            self.set_rtcl(self.G2, dictM["rtcl2"])
 
             self.set_speed(dictM["speed"])
             self.set_torque(dictM["torque"])
@@ -858,9 +858,9 @@ class jpgearqt(QWidget):
             self.updateRoe(_gear)
 
 
-    def set_rtcl(self, n, _rtcl):
+    def set_rtcl(self, _gear, _rtcl):
         if is_number(_rtcl):
-            if n == 1:
+            if _gear.ID == 1:
                 self.rtcl1 = float(_rtcl)
                 self.updateRootRadius(self.G1)
             else:
@@ -912,18 +912,18 @@ class jpgearqt(QWidget):
             _gear.Ros = (self.mod * (_gear.N+2) / 2)
 
             self.updateRomax(_gear)
-            if _gear.Ro < _gear.Rb:
+            if _gear.Ro < _gear.Rp:
                 self.set_Ro(_gear, _gear.Ros)
             else:
                 self.set_Ro(_gear, _gear.Ro)
 
+            self.calcStandardRtcl()
+
             if _gear.ID == 1:
-                # self.ui.lb_Rb1.setText(str("{:.3f}".format(self.G1.Rb)))
                 self.ui.lb_Rs1.setText(str("{:.3f}".format(self.G1.Rs)))
                 self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
                 self.ui.lb_Ros1.setText(str("{:.3f}".format(self.G1.Ros)))
             else:
-                # self.ui.lb_Rb2.setText(str("{:.3f}".format(self.G2.Rb)))
                 self.ui.lb_Rs2.setText(str("{:.3f}".format(self.G2.Rs)))
                 self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
                 self.ui.lb_Ros2.setText(str("{:.3f}".format(self.G2.Ros)))
@@ -1030,6 +1030,29 @@ class jpgearqt(QWidget):
             self.ui.lb_Rtipmax1.setText(str("{:.3f}".format(self.G1.Rtip_max)))
         else:
             self.ui.lb_Rtipmax2.setText(str("{:.3f}".format(self.G2.Rtip_max)))
+
+
+    def calcStandardRtcl(self):
+        if self.G1.Ros < 0 or self.G2.Ros < 0:
+            return
+
+        addendum1 = self.G1.Ros - self.G1.Rp
+        addendum2 = self.G2.Ros - self.G2.Rp
+
+        rtcl1 = 0.25 * addendum2
+        rtcl2 = 0.25 * addendum1
+
+        self.set_rtcl(self.G1, rtcl1)
+        self.set_rtcl(self.G2, rtcl2)
+
+        self.ui.le_rtcl1.setText(str("{:.3f}".format(self.rtcl1)))
+        self.ui.le_rtcl2.setText(str("{:.3f}".format(self.rtcl2)))
+
+        self.G1.Rrs = self.G1.Rp - addendum2 - self.rtcl1
+        self.G2.Rrs = self.G2.Rp - addendum1 - self.rtcl2
+
+        self.ui.lb_Rrs1.setText(str("{:.3f}".format(self.G1.Rrs)))
+        self.ui.lb_Rrs2.setText(str("{:.3f}".format(self.G2.Rrs)))
 
     def updateMaxRootFillet(self, _gear):
         if _gear.N < 0 or _gear.Rr < 0:
@@ -1229,12 +1252,15 @@ class jpgearqt(QWidget):
 
 
     def updateRootRadius(self, _gear):
+        if self.CD < 0:
+            return
+
         if _gear.ID == 1:
             self.G1.Rr = self.CD - self.G2.Ro - self.rtcl1
-            # self.ui.lb_Rr1.setText(str("{:.3f}".format(_gear.Rr)))
+            self.ui.lb_Rr1.setText(str("{:.3f}".format(_gear.Rr)))
         else:
             self.G2.Rr = self.CD - self.G1.Ro - self.rtcl2
-            # self.ui.lb_Rr2.setText(str("{:.3f}".format(_gear.Rr)))
+            self.ui.lb_Rr2.setText(str("{:.3f}".format(_gear.Rr)))
 
         self.updateMaxRootFillet(_gear)
         self.checkUndercut(_gear)
@@ -1832,8 +1858,13 @@ class jpgearqt(QWidget):
         # convert torque to force through HPSTC tangent to base circle
         w = self.torque / (self.G1.Rb * FW)
 
+        self.calcPitchLineVelocity()
         self.calcContactStress(w)
         self.calcBendingStress(w)
+
+    def calcPitchLineVelocity(self):
+        velocity = (tau * self.G1.Rp * (float(self.ui.le_speed.text()) / 60)) / 1000
+        self.ui.lb_pitchLineVel.setText(str("{:.3f}".format(velocity)))
 
     def calcContactStress(self, _w):
         # elastic coefficient

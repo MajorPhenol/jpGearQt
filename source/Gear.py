@@ -22,6 +22,7 @@ class Gear:
         self.Roe = 0    			# effective outer radius, considering tip radius
 
         self.Rr = -1                            # root radius
+        self.Rrs = -1                           # standard root radius
         self.Rf = 0				# root fillet radius
         self.Rff = 0				# root full fillet radius
         self.theta_F = 0			# angle between tooth centerline and root fillet center
