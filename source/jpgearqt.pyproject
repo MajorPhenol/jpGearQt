@@ -3,6 +3,7 @@
         "jpgearqt.py",
         "form.ui",
         "popup.ui",
-        "Gear.py"
+        "Gear.py",
+        "Units.py"
     ]
 }

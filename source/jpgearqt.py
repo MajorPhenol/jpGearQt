@@ -12,19 +12,21 @@
 
 import sys
 import os, tempfile
+from enum import Enum
 
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PySide6.QtWidgets import QMenuBar, QMenu
 from PySide6.QtWidgets import QFileDialog, QDialog, QDialogButtonBox, QMessageBox
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction
+from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction, QActionGroup
 
 from ui_form import Ui_jpgearqt
 from ui_popup import Ui_Popup
 
 ###############################################################################
 from Gear import Gear
+import Units
 
 import numpy as np
 from numpy import pi, sin, cos, tan, arcsin, arccos, arctan
@@ -48,6 +50,17 @@ import json
 import ezdxf
 from ezdxf.math import UCS
 from ezdxf import zoom
+
+###############################################################################
+# Use this code to signal the splash screen removal.
+if "NUITKA_ONEFILE_PARENT" in os.environ:
+   splash_filename = os.path.join(
+      tempfile.gettempdir(),
+      "onefile_%d_splash_feedback.tmp" % int(os.environ["NUITKA_ONEFILE_PARENT"]),
+   )
+
+   if os.path.exists(splash_filename):
+      os.unlink(splash_filename)
 
 ###############################################################################
 # why isn't this in numpy???
@@ -86,16 +99,6 @@ def revInvF(angle):
 
     return arccos(1/x)
 
-###############################################################################
-# Use this code to signal the splash screen removal.
-if "NUITKA_ONEFILE_PARENT" in os.environ:
-   splash_filename = os.path.join(
-      tempfile.gettempdir(),
-      "onefile_%d_splash_feedback.tmp" % int(os.environ["NUITKA_ONEFILE_PARENT"]),
-   )
-
-   if os.path.exists(splash_filename):
-      os.unlink(splash_filename)
 
 ###############################################################################
 class MplCanvas(FigureCanvasQTAgg):
@@ -119,10 +122,10 @@ class popupWindow(QWidget):
 
     def updateCircles(self):
         if self.ui.cb_circlesAnim.isChecked():
-            circleCol1 = self.jpgearqt.addCircles(self.jpgearqt.G1, self.canvas, collection=True)
-            circleCol2 = self.jpgearqt.addCircles(self.jpgearqt.G2, self.canvas, collection=True)
-            circleCol2.set_transform(mtransforms.Affine2D().translate(self.jpgearqt.CD, 0) + self.canvas.axes.transData)
-
+            circleCol1 = self.jpgearqt.addCircles(self.jpgearqt.G1, self.canvas, _legend=False)
+            circleCol2 = self.jpgearqt.addCircles(self.jpgearqt.G2, self.canvas, _legend=False)
+            circleCol2.set_transform(mtransforms.Affine2D().translate(self.jpgearqt.CD/self.jpgearqt.units.lenMult, 0) + self.canvas.axes.transData)
+            # add labels so we can delete them later
             circleCol1.set_label('circleCol1')
             circleCol2.set_label('circleCol2')
 
@@ -140,16 +143,16 @@ class popupWindow(QWidget):
 
         # tight view
         if self.ui.cb_singleViewAnim.isChecked():
-            topLimit = self.jpgearqt.G1.Rp*sin(tau/self.jpgearqt.G1.N)
+            topLimit = (self.jpgearqt.G1.Rp*sin(tau/self.jpgearqt.G1.N)) / self.jpgearqt.units.lenMult
             bottomLimit = -topLimit
-            leftLimit = self.jpgearqt.G1.Rp - topLimit
-            rightLimit = self.jpgearqt.G1.Rp + topLimit
+            leftLimit = (self.jpgearqt.G1.Rp / self.jpgearqt.units.lenMult) - topLimit
+            rightLimit = (self.jpgearqt.G1.Rp / self.jpgearqt.units.lenMult) + topLimit
         # full view
         else:
             sizeBuffer = 1.1
-            leftLimit = -self.jpgearqt.G1.Ro * sizeBuffer
-            rightLimit = self.jpgearqt.CD + self.jpgearqt.G2.Ro * sizeBuffer
-            topLimit = max(self.jpgearqt.G1.Ro, self.jpgearqt.G2.Ro) * sizeBuffer
+            leftLimit = (-self.jpgearqt.G1.Ro * sizeBuffer) / self.jpgearqt.units.lenMult
+            rightLimit = (self.jpgearqt.CD + self.jpgearqt.G2.Ro * sizeBuffer) / self.jpgearqt.units.lenMult
+            topLimit = (max(self.jpgearqt.G1.Ro, self.jpgearqt.G2.Ro) * sizeBuffer) / self.jpgearqt.units.lenMult
             bottomLimit = -topLimit
 
         canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
@@ -171,25 +174,13 @@ class jpgearqt(QWidget):
         self.setupShortcuts()
         self.setupCanvases()
 
+        # for saving JSON
+        self.savePath = ''
+
         # gear objects
         self.G1 = Gear(1)
         self.G2 = Gear(2)
-
-        # mesh parameters
-        self.mod = -1                   # module
-        self.PA_deg = 20                # pressure angle, degrees
-        self.PA = deg2rad(self.PA_deg)  # pressure angle, radians
-        self.OPA_deg = -1               # operating pressure angle, degrees
-        self.OPA = -1                   # operating pressure angle, radians
-        self.bkl = 0                    # backlash
-        self.rtcl1 = 0                  # root clearances
-        self.rtcl2 = 0
-        self.CD = -1                    # center distance
-        self.CR = 0                     # contact ratio
-        self.speed = 1                    # pinion speed
-        self.torque = 1                 # pinion torque
-
-        self.savePath = ''              # for saving JSON
+        self.resetMeshParams()
 
         self.initGearDesignFields()
 
@@ -222,10 +213,68 @@ class jpgearqt(QWidget):
         actExit.setShortcut(QKeySequence("Ctrl+Q"))
         actExit.triggered.connect(lambda: sys.exit())
 
-        # Help Menu
-        # menuHelp = menuBar.addMenu('&Help')
-        # actHelp = menuHelp.addAction('Help Menu')
-        # actHelp.triggered.connect(lambda: )
+        # Options Menu
+        # UI unit labels
+        self.unitsList = Units.unitsList
+        self.units = self.unitsList[0]
+
+        self.modLabelList = [
+            self.ui.lb_targetMod_unit,
+            self.ui.lb_mod_unit,
+        ]
+
+        self.lengthLabelList = [
+            self.ui.lb_targetCD_unit,
+            self.ui.lb_CD_bkl_unit,
+            self.ui.lb_CD_unit,
+            self.ui.lb_Rf_unit,
+            self.ui.lb_Rff_unit,
+            self.ui.lb_Ro_unit,
+            self.ui.lb_Roe_unit,
+            self.ui.lb_Romax_unit,
+            self.ui.lb_Ros_unit,
+            self.ui.lb_Rp_unit,
+            self.ui.lb_Rr_unit,
+            self.ui.lb_Rrs_unit,
+            self.ui.lb_Rs_unit,
+            self.ui.lb_Rtip_unit,
+            self.ui.lb_Rtipmax_unit,
+            self.ui.lb_bkl_unit,
+            self.ui.lb_rtcl_unit,
+            self.ui.lb_tt_unit,
+            self.ui.lb_tts_unit,
+            self.ui.lb_FW_unit
+        ]
+
+        self.torqueLabelList = [
+            self.ui.lb_torque_unit
+        ]
+
+        self.pressureLabelList = [
+            self.ui.lb_E_unit,
+            self.ui.lb_stressB_unit,
+            self.ui.lb_stressC_unit
+        ]
+
+        self.velLabelList = [
+            self.ui.lb_pitchLineVel_unit
+        ]
+
+        menuOptions = menuBar.addMenu('&Options')
+
+        menuUnits = menuOptions.addMenu('Units')
+        # use an ActionGroup to keep the unit chooses exclusive
+        self.groupUnits = QActionGroup(self)
+        self.groupUnits.setExclusive(True)
+
+        for i in range(len(self.unitsList)):
+            action = self.groupUnits.addAction(self.unitsList[i].lenName + " / " + self.unitsList[i].torqueName)
+            menuUnits.addAction(action)
+            action.setCheckable(True)
+            action.triggered.connect(lambda _, index=i: self.setUnits(index))
+
+            if i == 0:
+                action.setChecked(True)
 
         # add menu to ui
         self.ui.topLayout.insertWidget(0, menuBar)
@@ -302,7 +351,7 @@ class jpgearqt(QWidget):
         self.ui.pb_animate.clicked.connect(lambda: self.createAnimWindow())
 
         # Stress tab
-        self.ui.le_speed.editingFinished.connect(lambda: self.set_speed(self.ui.le_speed.text()))
+        self.ui.le_RPM.editingFinished.connect(lambda: self.set_RPM(self.ui.le_RPM.text()))
         self.ui.le_torque.editingFinished.connect(lambda: self.set_torque(self.ui.le_torque.text()))
         self.ui.le_E1.editingFinished.connect(lambda: self.set_E(self.G1, self.ui.le_E1.text()))
         self.ui.le_E2.editingFinished.connect(lambda: self.set_E(self.G2, self.ui.le_E2.text()))
@@ -311,32 +360,6 @@ class jpgearqt(QWidget):
 
         # stress button
         self.ui.pb_stress.clicked.connect(lambda: self.updateStress())
-
-
-    def swapBklandCD(self):
-        # input backlash
-        if self.ui.cb_CD_bkl.currentIndex() == 0:
-            self.ui.lb_bkl_text.hide()
-            self.ui.lb_bkl_units.hide()
-            self.ui.lb_bkl_value.hide()
-            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.bkl)))
-
-            self.ui.lb_CD_text.show()
-            self.ui.lb_CD_units.show()
-            self.ui.lb_CD_value.show()
-            self.ui.lb_CD_value.setText(str("{:.3f}".format(self.CD)))
-
-        # input center distance
-        elif self.ui.cb_CD_bkl.currentIndex() == 1:
-            self.ui.lb_CD_text.hide()
-            self.ui.lb_CD_units.hide()
-            self.ui.lb_CD_value.hide()
-            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.CD)))
-
-            self.ui.lb_bkl_text.show()
-            self.ui.lb_bkl_units.show()
-            self.ui.lb_bkl_value.show()
-            self.ui.lb_bkl_value.setText(str("{:.3f}".format(self.bkl)))
 
     def cycleTab(self, dir='forward'):
         tabs = self.ui.tabW_main
@@ -386,50 +409,55 @@ class jpgearqt(QWidget):
         toolbarStress2 = NavigationToolbar2QT(self.canvasStress2, self)
         stress_layout2.insertWidget(1, toolbarStress2)
 
+    def resetMeshParams(self):
+        # mesh parameters
+        self.mod = -1                   # module
+        self.PA_deg = 20                # pressure angle, degrees
+        self.PA = deg2rad(self.PA_deg)  # pressure angle, radians
+        self.OPA_deg = -1               # operating pressure angle, degrees
+        self.OPA = -1                   # operating pressure angle, radians
+        self.bkl = 0                    # backlash
+        self.rtcl1 = 0                  # root clearances
+        self.rtcl2 = 0
+        self.CD = -1                    # center distance
+        self.CR = 0                     # contact ratio
+        self.RPM = 1                  # pinion speed
+        self.torque = 1                 # pinion torque
+
     def initGearDesignFields(self):
+        # Called on startup and whenever a file is loaded
+
         # gear design tab
         if self.mod > 0:
-            self.ui.le_mod.setText(str("{:.2f}".format((self.mod))))
+            if self.units.modMult == "M":
+                self.setText(self.ui.le_mod, self.mod)
+            elif self.units.modMult == "T":
+                self.setText(self.ui.le_mod, 25.4/self.mod)
 
-        self.ui.le_PA_deg.setText(str("{:.1f}".format((self.PA_deg))))
-
-        if self.ui.cb_CD_bkl.currentIndex() == 0:
-            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.bkl)))
-            self.ui.lb_CD_text.hide()
-            self.ui.lb_CD_units.hide()
-            self.ui.lb_CD_value.hide()
-        else:
-            self.ui.le_CD_bkl.setText(str("{:.3f}".format(self.CD)))
-            self.ui.lb_bkl_text.hide()
-            self.ui.lb_bkl_units.hide()
-            self.ui.lb_bkl_value.hide()
-
-        self.ui.le_rtcl1.setText(str("{:.3f}".format(self.rtcl1)))
-        self.ui.le_rtcl2.setText(str("{:.3f}".format(self.rtcl2)))
+        self.setText(self.ui.le_PA_deg, self.PA_deg, 1, "{:.1f}")
+        self.swapBklandCD()
 
         if self.G1.N > 0:
-            self.ui.le_N1.setText(str(self.G1.N))
+            self.setText(self.ui.le_N1, self.G1.N)
         if self.G2.N > 0:
-            self.ui.le_N2.setText(str(self.G2.N))
+            self.setText(self.ui.le_N2, self.G2.N)
 
-        self.ui.le_x1.setText(str("{:.3f}".format(self.G1.x)))
-        self.ui.le_x2.setText(str("{:.3f}".format(self.G2.x)))
+        self.setText(self.ui.le_x1, self.G1.x)
+        self.setText(self.ui.le_x2, self.G2.x)
 
         if self.G1.Ro > 0:
-            self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
+            self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
         if self.G2.Ro > 0:
-            self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
+            self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
 
-        self.ui.le_Rtip1.setText(str("{:.3f}".format(self.G1.Rtip)))
-        self.ui.le_Rtip2.setText(str("{:.3f}".format(self.G2.Rtip)))
-        self.ui.le_Rf1.setText(str("{:.3f}".format(self.G1.Rf)))
-        self.ui.le_Rf2.setText(str("{:.3f}".format(self.G2.Rf)))
-        self.ui.le_FW1.setText(str("{:.3f}".format(self.G1.FW)))
-        self.ui.le_FW2.setText(str("{:.3f}".format(self.G2.FW)))
-        self.ui.le_E1.setText(str("{:.3f}".format(self.G1.E)))
-        self.ui.le_E2.setText(str("{:.3f}".format(self.G2.E)))
-        self.ui.le_nu1.setText(str("{:.3f}".format(self.G1.nu)))
-        self.ui.le_nu2.setText(str("{:.3f}".format(self.G2.nu)))
+        self.setText(self.ui.le_Rtip1, self.G1.Rtip, self.units.lenMult)
+        self.setText(self.ui.le_Rtip2, self.G2.Rtip, self.units.lenMult)
+
+        self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
+        self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
+
+        self.setText(self.ui.le_Rf1, self.G1.Rf, self.units.lenMult)
+        self.setText(self.ui.le_Rf2, self.G2.Rf, self.units.lenMult)
 
         # mesh slider
         self.sliderScale = 100    # the slider can only handle ints, show scale up everthing
@@ -438,14 +466,17 @@ class jpgearqt(QWidget):
         self.ui.hSlider_Mesh.setSliderPosition(1*self.sliderScale)    # pitch point happens at slider = 1
 
         # stress tab
-        self.ui.le_FW1.setText(str("{:.0f}".format(self.G1.FW)))
-        self.ui.le_FW2.setText(str("{:.0f}".format(self.G2.FW)))
-        self.ui.le_E1.setText(str("{:.0f}".format(self.G1.E)))
-        self.ui.le_E2.setText(str("{:.0f}".format(self.G2.E)))
-        self.ui.le_nu1.setText(str("{:.2f}".format(self.G1.nu)))
-        self.ui.le_nu2.setText(str("{:.2f}".format(self.G2.nu)))
-        self.ui.le_speed.setText(str("{:.0f}".format(self.speed)))
-        self.ui.le_torque.setText(str("{:.0f}".format(self.torque)))
+        self.setText(self.ui.le_FW1, self.G1.FW, self.units.lenMult)
+        self.setText(self.ui.le_FW2, self.G2.FW, self.units.lenMult)
+
+        self.setText(self.ui.le_E1, self.G1.E, self.units.pressureMult, "{:.0f}")
+        self.setText(self.ui.le_E2, self.G2.E, self.units.pressureMult, "{:.0f}")
+
+        self.setText(self.ui.le_nu1, self.G1.nu, 1)
+        self.setText(self.ui.le_nu2, self.G2.nu, 1)
+
+        self.setText(self.ui.le_RPM, self.RPM, 1, "{:.0f}")
+        self.setText(self.ui.le_torque, self.torque, self.units.torqueMult, "{:.0f}")
 
     def exportDXF(self):
         for gear in [self.G1, self.G2]:
@@ -468,24 +499,28 @@ class jpgearqt(QWidget):
             dictG2 = dictFull["Gear2"]
             dictM = dictFull["Mesh"]
 
+            # start with a clean slate
+            self.G1.reset()
+            self.G2.reset()
+            self.resetMeshParams()
+
             # set mesh parameters
+            self.setUnits(int(dictM["units"]))
+            actionsList = self.groupUnits.actions()
+            actionsList[int(dictM["units"])].setChecked(True)
+
             self.set_mod(dictM["mod"])
             self.set_PA_deg(dictM["PA_deg"])
+
+            self.set_bkl(dictM["bkl"])
+            self.set_CD(dictM["CD"])
 
             if dictM["set_CD_bkl"] == 0:
                 # use backlash
                 self.ui.cb_CD_bkl.setCurrentIndex(0)
-                self.set_bkl(dictM["bkl"])
             else:
                 # use center distance
                 self.ui.cb_CD_bkl.setCurrentIndex(1)
-                self.set_CD(dictM["CD"])
-
-            self.set_rtcl(self.G1, dictM["rtcl1"])
-            self.set_rtcl(self.G2, dictM["rtcl2"])
-
-            self.set_speed(dictM["speed"])
-            self.set_torque(dictM["torque"])
 
             # set gear parameters
             for gear, dict in zip([self.G1, self.G2], [dictG1, dictG2]):
@@ -493,17 +528,28 @@ class jpgearqt(QWidget):
                 self.set_x(gear, dict["x"])
                 self.set_Ro(gear, dict["Ro"])
                 self.set_Rtip(gear, dict["Rtip"])
-            # split it up so that both N's are set before Rf
+
+            self.set_rtcl(self.G1, dictM["rtcl1"])
+            self.set_rtcl(self.G2, dictM["rtcl2"])
+
+            # split it up so that both N's and rtcl's are set before Rf
             for gear, dict in zip([self.G1, self.G2], [dictG1, dictG2]):
                 self.set_Rf(gear, dict["Rf"])
                 self.set_FW(gear, dict["FW"])
                 self.set_E(gear, dict["E"])
                 self.set_nu(gear, dict["nu"])
 
+            self.set_RPM(dictM["speed"])
+            self.set_torque(dictM["torque"])
+
             self.initGearDesignFields()
 
     def saveAsJSON(self):
-        defaultName = 'gear_design.json'
+        if self.savePath == '':
+            defaultName = 'gear_design.json'
+        else:
+            defaultName = self.savePath
+
         savePath, selectedFilter = QFileDialog.getSaveFileName(self, 'Save Design', defaultName)
 
         if savePath == '':
@@ -529,30 +575,66 @@ class jpgearqt(QWidget):
         return {
             "N" : _gear.N,
             "x" : _gear.x,
-            "Ro" : _gear.Ro,
-            "Rtip" : _gear.Rtip,
-            "Rf" : _gear.Rf,
-            "FW" : _gear.FW,
-            "E" : _gear.E,
+            "Ro" : _gear.Ro / self.units.lenMult,
+            "Rtip" : _gear.Rtip / self.units.lenMult,
+            "Rf" : _gear.Rf / self.units.lenMult,
+            "FW" : _gear.FW / self.units.lenMult,
+            "E" : _gear.E / self.units.pressureMult,
             "nu" : _gear.nu,
         }
     def createJSONMesh(self):
+        if self.units.modMult == "M":
+            mod = self.mod
+        elif self.units.modMult == "T":
+            mod = 25.4 / self.mod
+
         return {
-            "mod" : self.mod,
+            "units": self.unitsList.index(self.units),
+            "mod" : mod,
             "PA_deg" : self.PA_deg,
             "set_CD_bkl" : self.ui.cb_CD_bkl.currentIndex(),
-            "bkl" : self.bkl,
-            "CD" : self.CD,
-            "rtcl1" : self.rtcl1,
-            "rtcl2" : self.rtcl2,
-            "speed" : self.speed,
-            "torque" : self.torque
+            "bkl" : self.bkl / self.units.lenMult,
+            "CD" : self.CD / self.units.lenMult,
+            "rtcl1" : self.rtcl1 / self.units.lenMult,
+            "rtcl2" : self.rtcl2 / self.units.lenMult,
+            "speed" : self.RPM,
+            "torque" : self.torque / self.units.torqueMult
         }
+
+    def setUnits(self, unit):
+        self.units = self.unitsList[unit]
+
+        for label in self.modLabelList:
+            label.setText(self.units.modName)
+
+        for label in self.lengthLabelList:
+            label.setText(self.units.lenName)
+
+        for label in self.torqueLabelList:
+            label.setText(self.units.torqueName)
+
+        for label in self.pressureLabelList:
+            label.setText(self.units.pressureName)
+
+        for label in self.velLabelList:
+            label.setText(self.units.velName)
+
+    def setText(self, label, variable, mult=1, _format="{:.3f}"):
+        label.setText(str(_format.format(variable/mult)))
+
 # Helper Tab ##################################################################
     def findGearSizes(self):
-        type = self.ui.cb_CD_width.currentIndex()
+        try:
+            if self.units.modMult == "M":
+                mod = float(self.ui.le_targetMod.text())
+            elif self.units.modMult == "T":
+                mod = 25.4 / float(self.ui.le_targetMod.text())
+            GR = float(self.ui.le_targetGR.text())
+            size = float(self.ui.le_targetSize.text()) * self.units.lenMult
+        except:
+            return
 
-        if type == 0:
+        if self.ui.cb_CD_width.currentIndex() == 0:
             """
             (N1*mod)/2 + (N2*mod)/2 = CD  →  (mod/2)*N1 + (mod/2)*N2 = CD
             N2 / N1 = GR  →  GR*N1 - N2 = 0
@@ -560,24 +642,18 @@ class jpgearqt(QWidget):
             | mod/2 mod/2 | | N1 | = | CD |
             | GR    -1    | | N2 |   | 0  |
             """
-
-            try:
-                mod = float(self.ui.le_targetMod.text())
-                GR = float(self.ui.le_targetGR.text())
-                CD = float(self.ui.le_targetSize.text())
-            except:
-                return
-
             matA = np.array([ [mod/2, mod/2], [GR, -1] ])
-            matB = np.array([ [CD], [0] ])
+            matB = np.array([ [size], [0] ])
             matX = np.matmul(np.linalg.inv(matA), matB)
 
             N1 = round(float(matX[0, 0]))
             N2 = round(N1*GR)
             # N2 = round(float(matX[1, 0]))
 
-            self.ui.le_pN.setText(str("{:.0f}".format(N1)))
-            self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
+            # self.ui.le_pN.setText(str("{:.0f}".format(N1)))
+            # self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
+            self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+            self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
 
             self.populateChart(N2)
         else:
@@ -588,24 +664,18 @@ class jpgearqt(QWidget):
             | mod mod | | N1 | = | width - 2*mod |
             | GR  -1  | | N2 |   | 0             |
             """
-
-            try:
-                mod = float(self.ui.le_targetMod.text())
-                GR = float(self.ui.le_targetGR.text())
-                width = float(self.ui.le_targetSize.text())
-            except:
-                return
-
             matA = np.array([ [mod, mod], [GR, -1] ])
-            matB = np.array([ [width - 2*mod], [0] ])
+            matB = np.array([ [size - 2*mod], [0] ])
             matX = np.matmul(np.linalg.inv(matA), matB)
 
             N1 = round(float(matX[0, 0]))
             N2 = round(N1*GR)
             # N2 = round(float(matX[1, 0]))
 
-            self.ui.le_pN.setText(str("{:.0f}".format(N1)))
-            self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
+            # self.ui.le_pN.setText(str("{:.0f}".format(N1)))
+            # self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
+            self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+            self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
 
             self.populateChart(N2)
 
@@ -622,7 +692,10 @@ class jpgearqt(QWidget):
 
     def populateChart(self, _N2):
         try:
-            mod = float(self.ui.le_targetMod.text())
+            if self.units.modMult == "M":
+                mod = float(self.ui.le_targetMod.text())
+            elif self.units.modMult == "T":
+                mod = 25.4 / float(self.ui.le_targetMod.text())
             N1 = int(self.ui.le_pN.text())
         except:
             return
@@ -647,7 +720,7 @@ class jpgearqt(QWidget):
                         ]
 
         for N2, label, icon in zip(N2_list, N2_label_list, icon_label_list):
-            label.setText(str("{:.0f}".format(N2)))
+            self.setText(label, N2, 1, "{:.0f}")
             if np.gcd(N1, N2) == 1:
                 icon.setPixmap(self.good_pixmap)
             else:
@@ -663,7 +736,7 @@ class jpgearqt(QWidget):
 
         for N2, label in zip(N2_list, GR_label_list):
             GR = N2 / N1
-            label.setText(str("{:.2f}".format(GR)))
+            self.setText(label, GR, 1, "{:.3f}")
 
         CD_label_list = [
                         self.ui.lb_CD1,
@@ -675,7 +748,7 @@ class jpgearqt(QWidget):
 
         for N2, label in zip(N2_list, CD_label_list):
             CD = mod * (N1 + N2)/2
-            label.setText(str("{:.2f}".format(CD)))
+            self.setText(label, CD, self.units.lenMult, "{:.3f}")
 
         width_label_list = [
                         self.ui.lb_width1,
@@ -690,7 +763,7 @@ class jpgearqt(QWidget):
             Ros1 = mod * (N1 + 2)/2
             Ros2 = mod * (N2 + 2)/2
             width = Ros1 + CD + Ros2
-            label.setText(str("{:.2f}".format(width)))
+            self.setText(label, width, self.units.lenMult, "{:.3f}")
 
         self.drawLayout()
 
@@ -733,7 +806,10 @@ class jpgearqt(QWidget):
 
     def drawLayout(self):
         try:
-            mod = float(self.ui.le_targetMod.text())
+            if self.units.modMult == "M":
+                mod = float(self.ui.le_targetMod.text())
+            elif self.units.modMult == "T":
+                mod = 25.4 / float(self.ui.le_targetMod.text())
             N1 = int(self.ui.le_pN.text())
         except:
             return
@@ -779,20 +855,64 @@ class jpgearqt(QWidget):
         self.canvasHelper.axes.cla()
 
         sizeBuffer = 1.1
-        leftLimit = Ro1 * sizeBuffer
-        rightLimit = CD + (Ro2 * sizeBuffer)
-        yLimit = Ro2 * sizeBuffer
+        leftLimit = (Ro1 * sizeBuffer) / self.units.lenMult
+        rightLimit = (CD + (Ro2 * sizeBuffer)) / self.units.lenMult
+        yLimit = (Ro2 * sizeBuffer) / self.units.lenMult
         self.canvasHelper.axes.set_xlim(left=-leftLimit, right=rightLimit)
         self.canvasHelper.axes.set_ylim(bottom=-yLimit, top=yLimit)
         self.canvasHelper.axes.set_aspect('equal')
+
+        circleCol.set_transform(mtransforms.Affine2D().scale(1/self.units.lenMult) + self.canvasHelper.axes.transData)
         self.canvasHelper.axes.add_collection(circleCol)
 
         self.canvasHelper.draw()
 
 # Gear Design Tab #############################################################
+    def swapBklandCD(self):
+        # input backlash
+        if self.ui.cb_CD_bkl.currentIndex() == 0:
+            self.setText(self.ui.le_CD_bkl, self.bkl, self.units.lenMult)
+
+            self.ui.lb_bkl_text.hide()
+            self.ui.lb_bkl_unit.hide()
+            self.ui.lb_bkl_value.hide()
+
+            self.ui.lb_CD_text.show()
+            self.ui.lb_CD_unit.show()
+            self.ui.lb_CD_value.show()
+            self.setText(self.ui.lb_CD_value, self.CD, self.units.lenMult)
+
+        # input center distance
+        elif self.ui.cb_CD_bkl.currentIndex() == 1:
+            self.setText(self.ui.le_CD_bkl, self.CD, self.units.lenMult)
+
+            self.ui.lb_CD_text.hide()
+            self.ui.lb_CD_unit.hide()
+            self.ui.lb_CD_value.hide()
+
+            self.ui.lb_bkl_text.show()
+            self.ui.lb_bkl_unit.show()
+            self.ui.lb_bkl_value.show()
+            self.setText(self.ui.lb_bkl_value, self.bkl, self.units.lenMult)
+
+    def set_N(self, _gear, _N):
+        if is_number(_N):
+            _gear.N = int(_N)
+            if self.G1.N > 1 and self.G2.N > 1:
+                self.setText(self.ui.lb_GR, self.G2.N / self.G1.N)
+            self.set_x(_gear, _gear.x)
+
+    def set_x(self, _gear, _x):
+        if is_number(_x):
+            _gear.x = float(_x)
+            self.updateStandardToothThickness(_gear)
+
     def set_mod(self, _mod):
         if is_number(_mod):
-            self.mod = float(_mod)
+            if self.units.modMult == "M":
+                self.mod = float(_mod)
+            elif self.units.modMult == "T":
+                self.mod = 25.4 / float(_mod)
             self.updateStandardToothThickness(self.G1)
             self.updateStandardToothThickness(self.G2)
 
@@ -803,104 +923,14 @@ class jpgearqt(QWidget):
             self.updateStandardToothThickness(self.G1)
             self.updateStandardToothThickness(self.G2)
 
-    def set_bkl(self, _bkl):
-        if is_number(_bkl):
-            self.bkl = float(_bkl)
-            self.updateCenterDistance()
-
-    def set_CD(self, _CD):
-        if is_number(_CD):
-            self.CD = float(_CD)
-            self.updateCenterDistance()
-
-    def set_N(self, _gear, _N):
-        if is_number(_N):
-            _gear.N = int(_N)
-            self.set_x(_gear, _gear.x)
-
-            if self.G1.N > 1 and self.G2.N > 1:
-                self.ui.lb_GR.setText(str("{:.3f}".format(self.G2.N / self.G1.N)))
-
-    def set_x(self, _gear, _x):
-        if is_number(_x):
-            _gear.x = float(_x)
-            self.updateStandardToothThickness(_gear)
-
-    def set_Ro(self, _gear, _Ro):
-        if _gear.Romax < 0:
-            return
-
-        if is_number(_Ro):
-            if float(_Ro) > _gear.Romax:
-                _gear.Ro = _gear.Romax
-                if _gear.ID == 1:
-                    self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
-                else:
-                    self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
-            else:
-                _gear.Ro = float(_Ro)
-            # check that Rtip is still valid, shrink if necessary
-            self.updateMaxTipRadius(_gear)
-            self.set_Rtip(_gear, _gear.Rtip)
-            self.updateCenterDistance()
-
-    def set_Rtip(self, _gear, _Rtip):
-        if is_number(_Rtip):
-            if float(_Rtip) > _gear.Rtip_max:
-                _gear.Rtip = _gear.Rtip_max
-                if _gear.ID == 1:
-                    self.ui.le_Rtip1.setText(str("{:.3f}".format(_gear.Rtip)))
-                else:
-                    self.ui.le_Rtip2.setText(str("{:.3f}".format(_gear.Rtip)))
-            else:
-                _gear.Rtip = float(_Rtip)
-
-            self.updateRoe(_gear)
-
-
-    def set_rtcl(self, _gear, _rtcl):
-        if is_number(_rtcl):
-            if _gear.ID == 1:
-                self.rtcl1 = float(_rtcl)
-                self.updateRootRadius(self.G1)
-            else:
-                self.rtcl2 = float(_rtcl)
-                self.updateRootRadius(self.G2)
-
-    def set_Rf(self, _gear, _Rf):
-        if is_number(_Rf):
-            if float(_Rf) > _gear.Rff:
-                _gear.Rf = _gear.Rff
-                if _gear.ID == 1:
-                    self.ui.le_Rf1.setText(str("{:.3f}".format(_gear.Rf)))
-                else:
-                    self.ui.le_Rf2.setText(str("{:.3f}".format(_gear.Rf)))
-            else:
-                _gear.Rf = float(_Rf)
-
-            self.checkUndercut(_gear)
-
-    def set_FW(self, _gear, _FW):
-        if is_number(_FW):
-            _gear.FW = float(_FW)
-
-
-    def updateBklandCD(self):
-        # backlash
-        if self.ui.cb_CD_bkl.currentIndex() == 0:
-            self.set_bkl(float(self.ui.le_CD_bkl.text()))
-        # center distance
-        elif self.ui.cb_CD_bkl.currentIndex() == 1:
-            self.set_CD(float(self.ui.le_CD_bkl.text()))
-
     def updateStandardToothThickness(self, _gear):
         if self.mod > 0 and self.PA > 0:
             # GOIG 6.11
             _gear.tts = self.mod * (pi/2 + 2*_gear.x*tan(self.PA))
             if _gear.ID == 1:
-                self.ui.lb_tts1.setText(str("{:.3f}".format(self.G1.tts)))
+                self.setText(self.ui.lb_tts1, self.G1.tts, self.units.lenMult)
             else:
-                self.ui.lb_tts2.setText(str("{:.3f}".format(self.G2.tts)))
+                self.setText(self.ui.lb_tts2, self.G2.tts, self.units.lenMult)
 
             self.updateBaseAndPitch(_gear)
 
@@ -912,21 +942,43 @@ class jpgearqt(QWidget):
             _gear.Ros = (self.mod * (_gear.N+2) / 2)
 
             self.updateRomax(_gear)
-            if _gear.Ro < _gear.Rp:
-                self.set_Ro(_gear, _gear.Ros)
+            if _gear.Ro < _gear.Rp or _gear.Ro < 0:
+                self.set_Ro(_gear, _gear.Ros / self.units.lenMult)
             else:
-                self.set_Ro(_gear, _gear.Ro)
+                self.set_Ro(_gear, _gear.Ro / self.units.lenMult)
 
             self.calcStandardRtcl()
 
             if _gear.ID == 1:
-                self.ui.lb_Rs1.setText(str("{:.3f}".format(self.G1.Rs)))
-                self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
-                self.ui.lb_Ros1.setText(str("{:.3f}".format(self.G1.Ros)))
+                self.setText(self.ui.lb_Rs1, self.G1.Rs, self.units.lenMult)
+                self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+                self.setText(self.ui.lb_Ros1, self.G1.Ros, self.units.lenMult)
             else:
-                self.ui.lb_Rs2.setText(str("{:.3f}".format(self.G2.Rs)))
-                self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
-                self.ui.lb_Ros2.setText(str("{:.3f}".format(self.G2.Ros)))
+                self.setText(self.ui.lb_Rs2, self.G2.Rs, self.units.lenMult)
+                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
+                self.setText(self.ui.lb_Ros2, self.G2.Ros, self.units.lenMult)
+
+    def calcStandardRtcl(self):
+        if self.G1.Ros < 0 or self.G2.Ros < 0:
+            return
+
+        addendum1 = self.G1.Ros - self.G1.Rs
+        addendum2 = self.G2.Ros - self.G2.Rs
+
+        rtcl1 = (0.25 * addendum2) / self.units.lenMult
+        rtcl2 = (0.25 * addendum1) / self.units.lenMult
+
+        self.set_rtcl(self.G1, rtcl1)
+        self.set_rtcl(self.G2, rtcl2)
+
+        self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
+        self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
+
+        self.G1.Rrs = self.G1.Rs - addendum2 - self.rtcl1
+        self.G2.Rrs = self.G2.Rs - addendum1 - self.rtcl2
+
+        self.setText(self.ui.lb_Rrs1, self.G1.Rrs, self.units.lenMult)
+        self.setText(self.ui.lb_Rrs2, self.G2.Rrs, self.units.lenMult)
 
     def updateRomax(self, _gear):
         if _gear.Rs > 0:
@@ -938,32 +990,31 @@ class jpgearqt(QWidget):
             _gear.Romax = _gear.Rb / cos(phi_A)
 
             if _gear.ID == 1:
-                self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
-                self.ui.lb_Romax1.setText(str("{:.3f}".format(self.G1.Romax)))
+                # self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+                self.setText(self.ui.lb_Romax1, self.G1.Romax, self.units.lenMult)
             else:
-                self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
-                self.ui.lb_Romax2.setText(str("{:.3f}".format(self.G2.Romax)))
+                # self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
+                self.setText(self.ui.lb_Romax2, self.G2.Romax, self.units.lenMult)
 
-    def updateRoe(self, _gear):
-        if _gear.Rb < 0:
+    def set_Ro(self, _gear, _Ro):
+        if _gear.Romax < 0:
             return
 
-        if _gear.Ro < 0 and _gear.Ros > 0:
-            _gear.Ro = _gear.Ros
-            if _gear.ID == 1:
-                self.ui.le_Ro1.setText(str("{:.3f}".format(_gear.Ro)))
+        if is_number(_Ro):
+            if float(_Ro) * self.units.lenMult > _gear.Romax:
+                _gear.Ro = _gear.Romax
+                if _gear.ID == 1:
+                    # self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
+                    self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+                else:
+                    # self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
+                    self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
             else:
-                self.ui.le_Ro2.setText(str("{:.3f}".format(_gear.Ro)))
-
-        _gear.Roe = sqrt( _gear.Rb**2 + ( sqrt((_gear.Ro-_gear.Rtip)**2 - _gear.Rb**2) + _gear.Rtip )**2 )
-
-        if _gear.ID == 1:
-            self.ui.lb_Roe1.setText(str("{:.3f}".format(_gear.Roe)))
-        else:
-            self.ui.lb_Roe2.setText(str("{:.3f}".format(_gear.Roe)))
-
-        self.updateContactRatio()
-
+                _gear.Ro = float(_Ro) * self.units.lenMult
+            # check that Rtip is still valid, shrink if necessary
+            self.updateMaxTipRadius(_gear)
+            self.set_Rtip(_gear, _gear.Rtip)
+            self.updateCenterDistance()
 
     def updateMaxTipRadius(self, _gear):
         """
@@ -1027,112 +1078,68 @@ class jpgearqt(QWidget):
         phi_A_solved = least_squares(func, x0=initialGuess).x.item()
         _gear.Rtip_max = float(RTip1(phi_A_solved))
         if _gear.ID == 1:
-            self.ui.lb_Rtipmax1.setText(str("{:.3f}".format(self.G1.Rtip_max)))
+            # self.ui.lb_Rtipmax1.setText(str("{:.3f}".format(self.G1.Rtip_max)))
+            self.setText(self.ui.lb_Rtipmax1, self.G1.Rtip_max, self.units.lenMult)
         else:
-            self.ui.lb_Rtipmax2.setText(str("{:.3f}".format(self.G2.Rtip_max)))
+            # self.ui.lb_Rtipmax2.setText(str("{:.3f}".format(self.G2.Rtip_max)))
+            self.setText(self.ui.lb_Rtipmax2, self.G2.Rtip_max, self.units.lenMult)
 
-
-    def calcStandardRtcl(self):
-        if self.G1.Ros < 0 or self.G2.Ros < 0:
-            return
-
-        addendum1 = self.G1.Ros - self.G1.Rp
-        addendum2 = self.G2.Ros - self.G2.Rp
-
-        rtcl1 = 0.25 * addendum2
-        rtcl2 = 0.25 * addendum1
-
-        self.set_rtcl(self.G1, rtcl1)
-        self.set_rtcl(self.G2, rtcl2)
-
-        self.ui.le_rtcl1.setText(str("{:.3f}".format(self.rtcl1)))
-        self.ui.le_rtcl2.setText(str("{:.3f}".format(self.rtcl2)))
-
-        self.G1.Rrs = self.G1.Rp - addendum2 - self.rtcl1
-        self.G2.Rrs = self.G2.Rp - addendum1 - self.rtcl2
-
-        self.ui.lb_Rrs1.setText(str("{:.3f}".format(self.G1.Rrs)))
-        self.ui.lb_Rrs2.setText(str("{:.3f}".format(self.G2.Rrs)))
-
-    def updateMaxRootFillet(self, _gear):
-        if _gear.N < 0 or _gear.Rr < 0:
-            return
-
-        ###########################################################################
-        #   Calculate fillet radius. This function computes two separate distances:
-        #   1.) the distance from the fillet center to the involute curve, and
-        #   2.) the distance from the fillet center to the root circle
-        #   The function then finds the condition where these two distances are the
-        #   same.
-
-        N = _gear.N
-        tts = _gear.tts
-        Rs = _gear.Rs
-        Rb = _gear.Rb
-        Rr = _gear.Rr
-        PA = self.PA
-
-        # phi_A - profile angle at some point A on the involute
-        # theta_A - angle between tooth centerline and some point A on the involute
-        # phi_F - profile angle between fillet centerline and Rb, where a line tangent to
-        #   the base circle goes through some point A on the involute
-        # Rf_1 - distance between fillet centerline and some point A on the
-        #   involute, along a line tangent to the base circle
-        # Rf_2 - distance between the fillet center and the root circle
-        # JFI - junction of fillet and involute
-        ###########################################################################
-
-        # angle between tooth centerline and involute at base circle (phi_A = 0)
-        theta_A = tts/(2*Rs) + invF(PA)
-        # angle between involute at base circle and center of tooth gap
-        alpha = pi/N - theta_A
-        # full fillet radius assuming the JFI is on the base circle
-        Rfu = Rb * tan(alpha)
-        Rrmin = Rb - Rfu
-
-        # Undercut
-        if Rr < Rrmin:
-            _gear.Rff = -(Rr*sin(alpha))/(sin(alpha) - 1)
-        else:
-            # angle between tooth centerline and fillet centerline = pi/N
-            # phi_F = pi/N - theta_A + phi_A
-            # where: theta_A = tts/(2*Rs) + invF(PA) - invF(phi_A)
-            # where: invF(phi_A) = tan(phi_A) - phi_A
-            # => phi_F = pi/N - (tts/(2*Rs) + invF(PA) - (tan(phi_A) - phi_A)) + phi_A
-            def phi_F(phi_A):
-                  return pi/N - tts/(2*Rs) - invF(PA) + tan(phi_A)
-
-            def Rf1(phi_A):
-                  return Rb*(tan(phi_F(phi_A)) - tan(phi_A))
-
-            def Rf2(phi_A):
-                return Rb/cos(phi_F(phi_A)) - Rr
-
-            # Rf1 and Rf2 are equal, so this should be zero
-            def func(phi_A):
-                return Rf1(phi_A) - Rf2(phi_A)
-
-            # initial guess is at standard pitch radius
-            initialGuess = arccos(Rb/Rs)
-            phi_JFI = least_squares(func, x0=initialGuess).x.item()
-
-            # _gear.phi_JFI = phi_JFI
-            newRff = Rf1(phi_JFI)
-            if newRff < 0:
-                _gear.Rff = 0
+    def set_Rtip(self, _gear, _Rtip):
+        if is_number(_Rtip):
+            if float(_Rtip) * self.units.lenMult > _gear.Rtip_max:
+                _gear.Rtip = _gear.Rtip_max
+                if _gear.ID == 1:
+                    # self.ui.le_Rtip1.setText(str("{:.3f}".format(_gear.Rtip)))
+                    self.setText(self.ui.le_Rtip1, self.G1.Rtip, self.units.lenMult)
+                else:
+                    # self.ui.le_Rtip2.setText(str("{:.3f}".format(_gear.Rtip)))
+                    self.setText(self.ui.le_Rtip2, self.G2.Rtip, self.units.lenMult)
             else:
-                _gear.Rff = newRff
+                _gear.Rtip = float(_Rtip) * self.units.lenMult
 
-        if _gear.Rf > _gear.Rff:
-            self.set_Rf(_gear, _gear.Rff)
+            self.updateRoe(_gear)
 
-        # update UI
+    def updateRoe(self, _gear):
+        if _gear.Rb < 0:
+            return
+
+        if _gear.Ro < 0 and _gear.Ros > 0:
+            _gear.Ro = _gear.Ros
+            if _gear.ID == 1:
+                # self.ui.le_Ro1.setText(str("{:.3f}".format(_gear.Ro)))
+                self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+            else:
+                # self.ui.le_Ro2.setText(str("{:.3f}".format(_gear.Ro)))
+                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
+
+        _gear.Roe = sqrt( _gear.Rb**2 + ( sqrt((_gear.Ro-_gear.Rtip)**2 - _gear.Rb**2) + _gear.Rtip )**2 )
+
         if _gear.ID == 1:
-            self.ui.le_Rf1.setText(str("{:.3f}".format(_gear.Rf)))
-            self.ui.lb_Rff1.setText(str("{:.3f}".format(_gear.Rff)))
+            # self.ui.lb_Roe1.setText(str("{:.3f}".format(_gear.Roe)))
+            self.setText(self.ui.lb_Roe1, self.G1.Roe, self.units.lenMult)
         else:
-            self.ui.le_Rf2.setText(str("{:.3f}".format(_gear.Rf)))
-            self.ui.lb_Rff2.setText(str("{:.3f}".format(_gear.Rff)))
+            # self.ui.lb_Roe2.setText(str("{:.3f}".format(_gear.Roe)))
+            self.setText(self.ui.lb_Roe2, self.G2.Roe, self.units.lenMult)
+
+        self.updateContactRatio()
+
+    def set_bkl(self, _bkl):
+        if is_number(_bkl):
+            self.bkl = float(_bkl) * self.units.lenMult
+            self.updateCenterDistance()
+
+    def set_CD(self, _CD):
+        if is_number(_CD):
+            self.CD = float(_CD) * self.units.lenMult
+            self.updateCenterDistance()
+
+    def updateBklandCD(self):
+        # backlash
+        if self.ui.cb_CD_bkl.currentIndex() == 0:
+            self.set_bkl(float(self.ui.le_CD_bkl.text()))
+        # center distance
+        elif self.ui.cb_CD_bkl.currentIndex() == 1:
+            self.set_CD(float(self.ui.le_CD_bkl.text()))
 
     def updateCenterDistance(self):
         if self.G1.Rs < 0 or self.G2.Rs < 0:
@@ -1146,19 +1153,19 @@ class jpgearqt(QWidget):
         self.G1.tt = tt1.item()
         self.G2.tt = tt2.item()
 
-        self.ui.lb_Rp1.setText(str("{:.3f}".format(self.G1.Rp)))
-        self.ui.lb_Rp2.setText(str("{:.3f}".format(self.G2.Rp)))
-        self.ui.lb_tt1.setText(str("{:.3f}".format(self.G1.tt)))
-        self.ui.lb_tt2.setText(str("{:.3f}".format(self.G2.tt)))
+        self.setText(self.ui.lb_Rp1, self.G1.Rp, self.units.lenMult)
+        self.setText(self.ui.lb_Rp2, self.G2.Rp, self.units.lenMult)
+        self.setText(self.ui.lb_tt1, self.G1.tt, self.units.lenMult)
+        self.setText(self.ui.lb_tt2, self.G2.tt, self.units.lenMult)
 
         if self.ui.cb_CD_bkl.currentIndex() == 0:
             # update center distance
             self.CD = self.G1.Rp + self.G2.Rp
-            self.ui.lb_CD_value.setText(str("{:.3f}".format(self.CD)))
+            self.setText(self.ui.lb_CD_value, self.CD, self.units.lenMult)
         elif self.ui.cb_CD_bkl.currentIndex() == 1:
             # update backlash
             self.bkl = (tau*self.G1.Rp)/self.G1.N - self.G1.tt - self.G2.tt
-            self.ui.lb_bkl_value.setText(str("{:.3f}".format(self.bkl)))
+            self.setText(self.ui.lb_bkl_value, self.bkl, self.units.lenMult)
 
         # Operating pressure angle at updated center distance
         self.OPA = arccos((self.G1.Rb+self.G2.Rb) / self.CD)
@@ -1244,12 +1251,20 @@ class jpgearqt(QWidget):
 
         # Contact ratio
         self.CR = self.LoC / self.G1.Pb;
-        self.ui.lb_CR.setText(str("{:.3f}".format(self.CR)))
+        self.setText(self.ui.lb_CR, self.CR, 1)
 
         # Highest point of single tooth contact
         self.G1.Rhp = sqrt(self.G1.Rb**2 + self.C4**2);
         self.G2.Rhp = sqrt(self.G2.Rb**2 + (self.C6-self.C2)**2);
 
+    def set_rtcl(self, _gear, _rtcl):
+        if is_number(_rtcl):
+            if _gear.ID == 1:
+                self.rtcl1 = float(_rtcl) * self.units.lenMult
+                self.updateRootRadius(self.G1)
+            else:
+                self.rtcl2 = float(_rtcl) * self.units.lenMult
+                self.updateRootRadius(self.G2)
 
     def updateRootRadius(self, _gear):
         if self.CD < 0:
@@ -1257,13 +1272,106 @@ class jpgearqt(QWidget):
 
         if _gear.ID == 1:
             self.G1.Rr = self.CD - self.G2.Ro - self.rtcl1
-            self.ui.lb_Rr1.setText(str("{:.3f}".format(_gear.Rr)))
+            self.setText(self.ui.lb_Rr1, self.G1.Rr, self.units.lenMult)
         else:
             self.G2.Rr = self.CD - self.G1.Ro - self.rtcl2
-            self.ui.lb_Rr2.setText(str("{:.3f}".format(_gear.Rr)))
+            self.setText(self.ui.lb_Rr2, self.G2.Rr, self.units.lenMult)
 
         self.updateMaxRootFillet(_gear)
         self.checkUndercut(_gear)
+
+    def updateMaxRootFillet(self, _gear):
+        if _gear.N < 0 or _gear.Rr < 0:
+            return
+
+        ###########################################################################
+        #   Calculate fillet radius. This function computes two separate distances:
+        #   1.) the distance from the fillet center to the involute curve, and
+        #   2.) the distance from the fillet center to the root circle
+        #   The function then finds the condition where these two distances are the
+        #   same.
+
+        N = _gear.N
+        tts = _gear.tts
+        Rs = _gear.Rs
+        Rb = _gear.Rb
+        Rr = _gear.Rr
+        PA = self.PA
+
+        # phi_A - profile angle at some point A on the involute
+        # theta_A - angle between tooth centerline and some point A on the involute
+        # phi_F - profile angle between fillet centerline and Rb, where a line tangent to
+        #   the base circle goes through some point A on the involute
+        # Rf_1 - distance between fillet centerline and some point A on the
+        #   involute, along a line tangent to the base circle
+        # Rf_2 - distance between the fillet center and the root circle
+        # JFI - junction of fillet and involute
+        ###########################################################################
+
+        # angle between tooth centerline and involute at base circle (phi_A = 0)
+        theta_A = tts/(2*Rs) + invF(PA)
+        # angle between involute at base circle and center of tooth gap
+        alpha = pi/N - theta_A
+        # full fillet radius assuming the JFI is on the base circle
+        Rfu = Rb * tan(alpha)
+        Rrmin = Rb - Rfu
+
+        # Undercut
+        if Rr < Rrmin:
+            _gear.Rff = -(Rr*sin(alpha))/(sin(alpha) - 1)
+        else:
+            # angle between tooth centerline and fillet centerline = pi/N
+            # phi_F = pi/N - theta_A + phi_A
+            # where: theta_A = tts/(2*Rs) + invF(PA) - invF(phi_A)
+            # where: invF(phi_A) = tan(phi_A) - phi_A
+            # => phi_F = pi/N - (tts/(2*Rs) + invF(PA) - (tan(phi_A) - phi_A)) + phi_A
+            def phi_F(phi_A):
+                  return pi/N - tts/(2*Rs) - invF(PA) + tan(phi_A)
+
+            def Rf1(phi_A):
+                  return Rb*(tan(phi_F(phi_A)) - tan(phi_A))
+
+            def Rf2(phi_A):
+                return Rb/cos(phi_F(phi_A)) - Rr
+
+            # Rf1 and Rf2 are equal, so this should be zero
+            def func(phi_A):
+                return Rf1(phi_A) - Rf2(phi_A)
+
+            # initial guess is at standard pitch radius
+            initialGuess = arccos(Rb/Rs)
+            phi_JFI = least_squares(func, x0=initialGuess).x.item()
+
+            # _gear.phi_JFI = phi_JFI
+            newRff = Rf1(phi_JFI)
+            if newRff < 0:
+                _gear.Rff = 0
+            else:
+                _gear.Rff = newRff
+
+        if _gear.Rf > _gear.Rff:
+            self.set_Rf(_gear, _gear.Rff)
+
+        # update UI
+        if _gear.ID == 1:
+            self.setText(self.ui.le_Rf1, self.G1.Rf, self.units.lenMult)
+            self.setText(self.ui.lb_Rff1, self.G1.Rff, self.units.lenMult)
+        else:
+            self.setText(self.ui.le_Rf2, self.G2.Rf, self.units.lenMult)
+            self.setText(self.ui.lb_Rff2, self.G2.Rff, self.units.lenMult)
+
+    def set_Rf(self, _gear, _Rf):
+        if is_number(_Rf):
+            if float(_Rf) * self.units.lenMult > _gear.Rff:
+                _gear.Rf = _gear.Rff
+                if _gear.ID == 1:
+                    self.setText(self.ui.le_Rf1, self.G1.Rf, self.units.lenMult)
+                else:
+                    self.setText(self.ui.le_Rf2, self.G2.Rf, self.units.lenMult)
+            else:
+                _gear.Rf = float(_Rf) * self.units.lenMult
+
+            self.checkUndercut(_gear)
 
     def checkUndercut(self, _gear):
         if _gear.Rr < 0:
@@ -1289,7 +1397,6 @@ class jpgearqt(QWidget):
         else:
             _gear.undercut = False
             label.setText("")
-
 
         self.updateJFI(_gear)
 
@@ -1319,6 +1426,9 @@ class jpgearqt(QWidget):
             _gear.phi_JFI = phi_A
             _gear.theta_F = theta_F
 
+    def set_FW(self, _gear, _FW):
+        if is_number(_FW):
+            _gear.FW = float(_FW) * self.units.lenMult
 
 # Drawing #####################################################################
     def layoutGear(self, _gear, save=False):
@@ -1480,6 +1590,13 @@ class jpgearqt(QWidget):
                 return
 
             doc = ezdxf.new()
+            if self.units.lenName == "mm":
+                doc.units = ezdxf.units.MM
+            elif self.units.lenName == "in":
+                doc.units = ezdxf.units.IN
+
+            scale = 1 / self.units.lenMult
+
             msp = doc.modelspace()
 
             for n in range(G.N):
@@ -1487,32 +1604,32 @@ class jpgearqt(QWidget):
                     ucs = UCS(origin=(0,0,0)).rotate_local_z(angle)
 
                     # involute
-                    msp.add_lwpolyline(list(zip(RAx, RAy))).transform(ucs.matrix)
-                    msp.add_lwpolyline(list(zip(-RAx, RAy))).transform(ucs.matrix)
+                    msp.add_lwpolyline(list(zip(RAx, RAy))).transform(ucs.matrix).scale(scale, scale, scale)
+                    msp.add_lwpolyline(list(zip(-RAx, RAy))).transform(ucs.matrix).scale(scale, scale, scale)
 
                     # root fillet
                     if G.Rf > 0:
-                            msp.add_arc((Fx, Fy), radius=G.Rf, start_angle=filletStartAngle, end_angle=filletEndAngle).transform(ucs.matrix)
-                            msp.add_arc((-Fx, Fy), radius=G.Rf, start_angle=180-filletEndAngle, end_angle=180-filletStartAngle).transform(ucs.matrix)
+                            msp.add_arc((Fx, Fy), radius=G.Rf, start_angle=filletStartAngle, end_angle=filletEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
+                            msp.add_arc((-Fx, Fy), radius=G.Rf, start_angle=180-filletEndAngle, end_angle=180-filletStartAngle).transform(ucs.matrix).scale(scale, scale, scale)
 
                     # add straight line segment if undercut
                     if G.undercut == True:
-                            msp.add_line((Rjfi_x, Rjfi_y), (Rb_x, Rb_y)).transform(ucs.matrix)
-                            msp.add_line((-Rjfi_x, Rjfi_y), (-Rb_x, Rb_y)).transform(ucs.matrix)
+                            msp.add_line((Rjfi_x, Rjfi_y), (Rb_x, Rb_y)).transform(ucs.matrix).scale(scale, scale, scale)
+                            msp.add_line((-Rjfi_x, Rjfi_y), (-Rb_x, Rb_y)).transform(ucs.matrix).scale(scale, scale, scale)
 
                     # root radius
                     if G.Rf < G.Rff :
-                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle1, end_angle=RREndAngle1).transform(ucs.matrix)
-                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle2, end_angle=RREndAngle2).transform(ucs.matrix)
+                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle1, end_angle=RREndAngle1).transform(ucs.matrix).scale(scale, scale, scale)
+                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle2, end_angle=RREndAngle2).transform(ucs.matrix).scale(scale, scale, scale)
 
                     # tip radius
                     if G.Rtip > 0:
-                            msp.add_arc((Rtip_x,Rtip_y), radius=G.Rtip, start_angle=tipStartAngle, end_angle=tipEndAngle).transform(ucs.matrix)
-                            msp.add_arc((-Rtip_x,Rtip_y), radius=G.Rtip, start_angle=180-tipEndAngle, end_angle=180-tipStartAngle).transform(ucs.matrix)
+                            msp.add_arc((Rtip_x,Rtip_y), radius=G.Rtip, start_angle=tipStartAngle, end_angle=tipEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
+                            msp.add_arc((-Rtip_x,Rtip_y), radius=G.Rtip, start_angle=180-tipEndAngle, end_angle=180-tipStartAngle).transform(ucs.matrix).scale(scale, scale, scale)
 
                     # outer radius
                     if G.Rtip < G.Rtip_max:
-                            msp.add_arc((0, 0), radius=G.Ro, start_angle=ODStartAngle, end_angle=ODEndAngle).transform(ucs.matrix)
+                            msp.add_arc((0, 0), radius=G.Ro, start_angle=ODStartAngle, end_angle=ODEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
 
             zoom.extents(msp)
             doc.saveas(str(savePath))
@@ -1531,27 +1648,31 @@ class jpgearqt(QWidget):
             curveCollection = mcollections.PatchCollection(fullList, match_original=True)
             return curveCollection
 
-    def addCircles(self, _gear, _canvas, collection=False):
+    def addCircles(self, _gear, _canvas, _legend=True):
         if _gear.Rb < 0:
             return None
 
         circleList = []
         # base circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Rb, color='c', ls='--', fill=False, label='Base Circle'))
+        circleList.append(pyplot.Circle((0, 0), _gear.Rb / self.units.lenMult, color='c', ls='--', fill=False, label='Base Circle'))
         # # pitch circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Rp, color='y', ls='--', fill=False, label='Pitch Circle'))
+        circleList.append(pyplot.Circle((0, 0), _gear.Rp / self.units.lenMult, color='y', ls='--', fill=False, label='Pitch Circle'))
         # # outer circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Roe, color='g', ls='--', fill=False, label='Outer Circle'))
+        circleList.append(pyplot.Circle((0, 0), _gear.Roe / self.units.lenMult, color='g', ls='--', fill=False, label='Outer Circle'))
         # # root cirlce
-        circleList.append(pyplot.Circle((0, 0), _gear.Rr, color='r', ls='--', fill=False, label='Root Circle'))
+        circleList.append(pyplot.Circle((0, 0), _gear.Rr / self.units.lenMult, color='r', ls='--', fill=False, label='Root Circle'))
 
-        if collection == False:
+        # adding a legend only works if the circles are added individually, instead of as a collection
+        if _legend == True:
             for circle in circleList:
                 _canvas.axes.add_patch(circle)
+
             legendCircle = _canvas.axes.legend(loc='upper right', framealpha=1.0)
             _canvas.axes.add_artist(legendCircle)
+
         else:
-            return mcollections.PatchCollection(circleList, match_original=True)
+            circleCollection = mcollections.PatchCollection(circleList, match_original=True)
+            return circleCollection
 
     def drawGear(self, _gear, _updateAxes = False):
         if _gear.Rb < 0:
@@ -1569,13 +1690,15 @@ class jpgearqt(QWidget):
         if _updateAxes == False:
             leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
         else:
+            # single tooth view
             if cb_singleTooth.isChecked():
-                rightLimit = _gear.Rp*sin(tau/_gear.N)
+                rightLimit = (_gear.Rp*sin(tau/_gear.N)) / self.units.lenMult
                 leftLimit = -rightLimit
-                topLimit = _gear.Rp + rightLimit
-                bottomLimit = _gear.Rp - rightLimit
+                topLimit = (_gear.Rp / self.units.lenMult) + rightLimit
+                bottomLimit = (_gear.Rp / self.units.lenMult) - rightLimit
+            # full gear view
             else:
-                rightLimit = _gear.Ro * 1.1
+                rightLimit = (_gear.Ro * 1.1) / self.units.lenMult
                 leftLimit = -rightLimit
                 topLimit = rightLimit
                 bottomLimit = leftLimit
@@ -1590,10 +1713,11 @@ class jpgearqt(QWidget):
         canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
 
         curveCol = self.layoutGear(_gear)
+        curveCol.set_transform(mtransforms.Affine2D().scale(1/self.units.lenMult) + canvas.axes.transData)
         canvas.axes.add_collection(curveCol)
 
         if cb_circles.isChecked():
-            self.addCircles(_gear, canvas)
+            self.addCircles(_gear, canvas, _legend=True)
 
         canvas.draw()
 
@@ -1665,16 +1789,18 @@ class jpgearqt(QWidget):
         if _updateAxes == False:
             leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
         else:
+            # mesh view
             if cb_singleTooth.isChecked():
-                topLimit = self.G1.Rp*sin(tau/self.G1.N)
+                topLimit = (self.G1.Rp*sin(tau/self.G1.N)) / self.units.lenMult
                 bottomLimit = -topLimit
-                leftLimit = self.G1.Rp - topLimit
-                rightLimit = self.G1.Rp + topLimit
+                leftLimit = (self.G1.Rp / self.units.lenMult) - topLimit
+                rightLimit = (self.G1.Rp / self.units.lenMult) + topLimit
+            # full gear view
             else:
                 sizeBuffer = 1.1
-                leftLimit = -self.G1.Ro * sizeBuffer
-                rightLimit = self.CD + self.G2.Ro * sizeBuffer
-                topLimit = max(self.G1.Ro, self.G2.Ro) * sizeBuffer
+                leftLimit = (-self.G1.Ro * sizeBuffer) / self.units.lenMult
+                rightLimit = (self.CD + self.G2.Ro * sizeBuffer) / self.units.lenMult
+                topLimit = (max(self.G1.Ro, self.G2.Ro) * sizeBuffer) / self.units.lenMult
                 bottomLimit = -topLimit
 
         canvas.axes.cla()
@@ -1745,17 +1871,17 @@ class jpgearqt(QWidget):
         curveCol2 = self.layoutGear(self.G2)
         curveCol2.set_edgecolor('r')
 
-        curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1) + canvas.axes.transData)
-        curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).translate(self.CD, 0) + canvas.axes.transData)
+        curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/self.units.lenMult) + canvas.axes.transData)
+        curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/self.units.lenMult).translate(self.CD/self.units.lenMult, 0) + canvas.axes.transData)
 
         canvas.axes.add_collection(curveCol1)
         canvas.axes.add_collection(curveCol2)
 
         if cb_circles.isChecked():
-            self.addCircles(self.G1, canvas, collection=False)
+            self.addCircles(self.G1, canvas, _legend=True)
 
-            circleCol2 = self.addCircles(self.G2, canvas, collection=True)
-            circleCol2.set_transform(mtransforms.Affine2D().translate(self.CD, 0) + canvas.axes.transData)
+            circleCol2 = self.addCircles(self.G2, canvas, _legend=False)
+            circleCol2.set_transform(mtransforms.Affine2D().translate(self.CD/self.units.lenMult, 0) + canvas.axes.transData)
             canvas.axes.add_collection(circleCol2)
 
         if self.ui.cb_LoC.isChecked():
@@ -1785,13 +1911,13 @@ class jpgearqt(QWidget):
         window.ui.hLayout_toolbarAnim.insertWidget(0, toolbar)
 
         sizeBuffer = 1.1
-        leftLimit = -self.G1.Ro * sizeBuffer
-        rightLimit = self.CD + self.G2.Ro * sizeBuffer
-        topLimit = max(self.G1.Ro, self.G2.Ro) * sizeBuffer
+        leftLimit = (-self.G1.Ro * sizeBuffer) / self.units.lenMult
+        rightLimit = (self.CD + self.G2.Ro * sizeBuffer) / self.units.lenMult
+        topLimit = (max(self.G1.Ro, self.G2.Ro) * sizeBuffer) / self.units.lenMult
         bottomLimit = -topLimit
 
         window.canvas.axes.set_aspect('equal')
-        window.canvas.axes.set_box_aspect(1)
+        # window.canvas.axes.set_box_aspect(1)
         window.canvas.fig.tight_layout()
 
         window.canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
@@ -1802,7 +1928,6 @@ class jpgearqt(QWidget):
         curveCol2.set_edgecolor('r')
 
         window.canvas.axes.add_collection(curveCol1)
-        curveCol2.set_transform(mtransforms.Affine2D().translate(self.CD, 0) + window.canvas.axes.transData)
         window.canvas.axes.add_collection(curveCol2)
 
         # animation specs
@@ -1820,8 +1945,8 @@ class jpgearqt(QWidget):
             angle1 = (-pi/2) - updateAngle
             angle2 = pi/2 + pi/self.G2.N - 0.5*self.bkl/self.G2.Rs + ratio*updateAngle
 
-            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1) + window.canvas.axes.transData)
-            curveCol2.set_transform(mtransforms.Affine2D().rotate((angle2)).translate(self.CD, 0) + window.canvas.axes.transData)
+            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/self.units.lenMult) + window.canvas.axes.transData)
+            curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/self.units.lenMult).translate(self.CD/self.units.lenMult, 0) + window.canvas.axes.transData)
 
         self.anim = manimation.FuncAnimation(window.canvas.fig, animFunc, fargs=[maxSpeed, slider], frames=framesPerRev, interval=interval)
 
@@ -1830,17 +1955,17 @@ class jpgearqt(QWidget):
         window.show()
 
 # Stress ######################################################################
-    def set_speed(self, _speed):
-        if is_number(_speed):
-            self.speed = float(_speed)
+    def set_RPM(self, _RPM):
+        if is_number(_RPM):
+            self.RPM = float(_RPM)
 
     def set_torque(self, _torque):
         if is_number(_torque):
-            self.torque = float(_torque)
+            self.torque = float(_torque) * self.units.torqueMult
 
     def set_E(self, _gear, _E):
         if is_number(_E):
-            _gear.E = float(_E)
+            _gear.E = float(_E) * self.units.pressureMult
 
     def set_nu(self, _gear, _nu):
         if is_number(_nu):
@@ -1849,7 +1974,7 @@ class jpgearqt(QWidget):
     def updateStress(self):
         if self.G1.N < 1 or self.G2.N < 1:
             return
-        if self.G1.FW < 0 or self.G2.FW < 0:
+        if self.G1.FW <= 0 or self.G2.FW <= 0:
             return
 
         # use smallest face width
@@ -1863,15 +1988,15 @@ class jpgearqt(QWidget):
         self.calcBendingStress(w)
 
     def calcPitchLineVelocity(self):
-        velocity = (tau * self.G1.Rp * (float(self.ui.le_speed.text()) / 60)) / 1000
-        self.ui.lb_pitchLineVel.setText(str("{:.3f}".format(velocity)))
+        velocity = (tau * self.G1.Rp * (self.RPM / 60)) / 1000
+        self.setText(self.ui.lb_pitchLineVel, velocity, self.units.velMult)
 
     def calcContactStress(self, _w):
         # elastic coefficient
-        E1 = float(self.ui.le_E1.text())
-        E2 = float(self.ui.le_E2.text())
-        nu1 = float(self.ui.le_nu1.text())
-        nu2 = float(self.ui.le_nu2.text())
+        E1 = self.G1.E
+        E2 = self.G2.E
+        nu1 = self.G1.nu
+        nu2 = self.G2.nu
 
         Cp = 1/sqrt( (pi*(1-nu1**2)/E1) + (pi*(1-nu2**2)/E2) )
 
@@ -1881,8 +2006,8 @@ class jpgearqt(QWidget):
 
         stress = Cp * sqrt(_w*( (rho1+rho2)/(rho1*rho2) ))
 
-        self.ui.lb_stressC1.setText(str("{:.3f}".format(stress)))
-        self.ui.lb_stressC2.setText(str("{:.3f}".format(stress)))
+        self.setText(self.ui.lb_stressC1, stress, self.units.pressureMult)
+        self.setText(self.ui.lb_stressC2, stress, self.units.pressureMult)
 
     def calcBendingStress(self, _w):
         # Stress concentration factor Kf
@@ -1912,9 +2037,9 @@ class jpgearqt(QWidget):
                                     (0.5*self.mod*tan(gamma))/x_Lewis ) )
 
             if _gear.ID == 1:
-                self.ui.lb_stressB1.setText(str("{:.3f}".format(stress)))
+                self.setText(self.ui.lb_stressB1, stress, self.units.pressureMult)
             else:
-                self.ui.lb_stressB2.setText(str("{:.3f}".format(stress)))
+                self.setText(self.ui.lb_stressB2, stress, self.units.pressureMult)
 
             # draw tooth
             self.drawStress(_gear, _canvas, lewisParams)

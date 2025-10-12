@@ -17,10 +17,10 @@ from PySide6.QtGui import (QAction, QBrush, QColor, QConicalGradient,
     QPainter, QPalette, QPixmap, QRadialGradient,
     QTransform)
 from PySide6.QtWidgets import (QApplication, QButtonGroup, QCheckBox, QComboBox,
-    QFormLayout, QFrame, QGridLayout, QHBoxLayout,
-    QLabel, QLineEdit, QPushButton, QRadioButton,
-    QSizePolicy, QSlider, QSpacerItem, QTabWidget,
-    QVBoxLayout, QWidget)
+    QFrame, QGridLayout, QHBoxLayout, QLabel,
+    QLineEdit, QPushButton, QRadioButton, QSizePolicy,
+    QSlider, QSpacerItem, QTabWidget, QVBoxLayout,
+    QWidget)
 
 class Ui_jpgearqt(object):
     def setupUi(self, jpgearqt):
@@ -57,43 +57,33 @@ class Ui_jpgearqt(object):
 
         self.horizontalLayout_3.addItem(self.horizontalSpacer_5)
 
-        self.formLayout = QFormLayout()
-        self.formLayout.setObjectName(u"formLayout")
-        self.formLayout.setLabelAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-        self.lb_TargetModule = QLabel(self.tab_layout)
-        self.lb_TargetModule.setObjectName(u"lb_TargetModule")
+        self.gridLayout_4 = QGridLayout()
+        self.gridLayout_4.setObjectName(u"gridLayout_4")
+        self.le_targetGR = QLineEdit(self.tab_layout)
+        self.le_targetGR.setObjectName(u"le_targetGR")
         sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         sizePolicy1.setHorizontalStretch(0)
         sizePolicy1.setVerticalStretch(0)
-        sizePolicy1.setHeightForWidth(self.lb_TargetModule.sizePolicy().hasHeightForWidth())
-        self.lb_TargetModule.setSizePolicy(sizePolicy1)
-        self.lb_TargetModule.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.formLayout.setWidget(0, QFormLayout.LabelRole, self.lb_TargetModule)
-
-        self.le_targetMod = QLineEdit(self.tab_layout)
-        self.le_targetMod.setObjectName(u"le_targetMod")
-        sizePolicy1.setHeightForWidth(self.le_targetMod.sizePolicy().hasHeightForWidth())
-        self.le_targetMod.setSizePolicy(sizePolicy1)
-        self.le_targetMod.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.formLayout.setWidget(0, QFormLayout.FieldRole, self.le_targetMod)
-
-        self.lb_TargetGearRatio = QLabel(self.tab_layout)
-        self.lb_TargetGearRatio.setObjectName(u"lb_TargetGearRatio")
-        sizePolicy1.setHeightForWidth(self.lb_TargetGearRatio.sizePolicy().hasHeightForWidth())
-        self.lb_TargetGearRatio.setSizePolicy(sizePolicy1)
-        self.lb_TargetGearRatio.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.formLayout.setWidget(1, QFormLayout.LabelRole, self.lb_TargetGearRatio)
-
-        self.le_targetGR = QLineEdit(self.tab_layout)
-        self.le_targetGR.setObjectName(u"le_targetGR")
         sizePolicy1.setHeightForWidth(self.le_targetGR.sizePolicy().hasHeightForWidth())
         self.le_targetGR.setSizePolicy(sizePolicy1)
         self.le_targetGR.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.formLayout.setWidget(1, QFormLayout.FieldRole, self.le_targetGR)
+        self.gridLayout_4.addWidget(self.le_targetGR, 2, 1, 1, 1)
+
+        self.lb_TargetModule = QLabel(self.tab_layout)
+        self.lb_TargetModule.setObjectName(u"lb_TargetModule")
+        sizePolicy1.setHeightForWidth(self.lb_TargetModule.sizePolicy().hasHeightForWidth())
+        self.lb_TargetModule.setSizePolicy(sizePolicy1)
+        self.lb_TargetModule.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_4.addWidget(self.lb_TargetModule, 0, 0, 1, 1)
+
+        self.pb_calcGearSizes = QPushButton(self.tab_layout)
+        self.pb_calcGearSizes.setObjectName(u"pb_calcGearSizes")
+        sizePolicy1.setHeightForWidth(self.pb_calcGearSizes.sizePolicy().hasHeightForWidth())
+        self.pb_calcGearSizes.setSizePolicy(sizePolicy1)
+
+        self.gridLayout_4.addWidget(self.pb_calcGearSizes, 5, 1, 1, 1)
 
         self.cb_CD_width = QComboBox(self.tab_layout)
         self.cb_CD_width.addItem("")
@@ -103,7 +93,15 @@ class Ui_jpgearqt(object):
         self.cb_CD_width.setSizePolicy(sizePolicy1)
         self.cb_CD_width.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
-        self.formLayout.setWidget(2, QFormLayout.LabelRole, self.cb_CD_width)
+        self.gridLayout_4.addWidget(self.cb_CD_width, 4, 0, 1, 1)
+
+        self.lb_TargetGearRatio = QLabel(self.tab_layout)
+        self.lb_TargetGearRatio.setObjectName(u"lb_TargetGearRatio")
+        sizePolicy1.setHeightForWidth(self.lb_TargetGearRatio.sizePolicy().hasHeightForWidth())
+        self.lb_TargetGearRatio.setSizePolicy(sizePolicy1)
+        self.lb_TargetGearRatio.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_4.addWidget(self.lb_TargetGearRatio, 2, 0, 1, 1)
 
         self.le_targetSize = QLineEdit(self.tab_layout)
         self.le_targetSize.setObjectName(u"le_targetSize")
@@ -111,17 +109,42 @@ class Ui_jpgearqt(object):
         self.le_targetSize.setSizePolicy(sizePolicy1)
         self.le_targetSize.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.formLayout.setWidget(2, QFormLayout.FieldRole, self.le_targetSize)
+        self.gridLayout_4.addWidget(self.le_targetSize, 4, 1, 1, 1)
 
-        self.pb_calcGearSizes = QPushButton(self.tab_layout)
-        self.pb_calcGearSizes.setObjectName(u"pb_calcGearSizes")
-        sizePolicy1.setHeightForWidth(self.pb_calcGearSizes.sizePolicy().hasHeightForWidth())
-        self.pb_calcGearSizes.setSizePolicy(sizePolicy1)
+        self.le_targetMod = QLineEdit(self.tab_layout)
+        self.le_targetMod.setObjectName(u"le_targetMod")
+        sizePolicy1.setHeightForWidth(self.le_targetMod.sizePolicy().hasHeightForWidth())
+        self.le_targetMod.setSizePolicy(sizePolicy1)
+        self.le_targetMod.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.formLayout.setWidget(3, QFormLayout.FieldRole, self.pb_calcGearSizes)
+        self.gridLayout_4.addWidget(self.le_targetMod, 0, 1, 1, 1)
+
+        self.lb_targetMod_unit = QLabel(self.tab_layout)
+        self.lb_targetMod_unit.setObjectName(u"lb_targetMod_unit")
+        sizePolicy1.setHeightForWidth(self.lb_targetMod_unit.sizePolicy().hasHeightForWidth())
+        self.lb_targetMod_unit.setSizePolicy(sizePolicy1)
+        self.lb_targetMod_unit.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_4.addWidget(self.lb_targetMod_unit, 0, 2, 1, 1)
+
+        self.lb_TargetModule_3 = QLabel(self.tab_layout)
+        self.lb_TargetModule_3.setObjectName(u"lb_TargetModule_3")
+        sizePolicy1.setHeightForWidth(self.lb_TargetModule_3.sizePolicy().hasHeightForWidth())
+        self.lb_TargetModule_3.setSizePolicy(sizePolicy1)
+        self.lb_TargetModule_3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_4.addWidget(self.lb_TargetModule_3, 2, 2, 1, 1)
+
+        self.lb_targetCD_unit = QLabel(self.tab_layout)
+        self.lb_targetCD_unit.setObjectName(u"lb_targetCD_unit")
+        sizePolicy1.setHeightForWidth(self.lb_targetCD_unit.sizePolicy().hasHeightForWidth())
+        self.lb_targetCD_unit.setSizePolicy(sizePolicy1)
+        self.lb_targetCD_unit.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_4.addWidget(self.lb_targetCD_unit, 4, 2, 1, 1)
 
 
-        self.horizontalLayout_3.addLayout(self.formLayout)
+        self.horizontalLayout_3.addLayout(self.gridLayout_4)
 
         self.horizontalSpacer_2 = QSpacerItem(240, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
@@ -142,11 +165,11 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2 = QGridLayout()
         self.gridLayout_2.setObjectName(u"gridLayout_2")
-        self.lb_CenterDistance = QLabel(self.tab_layout)
-        self.lb_CenterDistance.setObjectName(u"lb_CenterDistance")
-        self.lb_CenterDistance.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_GR5 = QLabel(self.tab_layout)
+        self.lb_GR5.setObjectName(u"lb_GR5")
+        self.lb_GR5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_CenterDistance, 1, 6, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_GR5, 7, 5, 1, 1)
 
         self.rb_2 = QRadioButton(self.tab_layout)
         self.buttonGroup = QButtonGroup(jpgearqt)
@@ -157,13 +180,11 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.rb_2, 4, 10, 1, 1)
 
-        self.rb_3 = QRadioButton(self.tab_layout)
-        self.buttonGroup.addButton(self.rb_3)
-        self.rb_3.setObjectName(u"rb_3")
-        self.rb_3.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.rb_3.setChecked(True)
+        self.lb_width2 = QLabel(self.tab_layout)
+        self.lb_width2.setObjectName(u"lb_width2")
+        self.lb_width2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.rb_3, 5, 10, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_width2, 4, 7, 1, 1)
 
         self.lb_gN4 = QLabel(self.tab_layout)
         self.lb_gN4.setObjectName(u"lb_gN4")
@@ -171,71 +192,17 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.lb_gN4, 6, 4, 1, 1)
 
-        self.lb_gN1 = QLabel(self.tab_layout)
-        self.lb_gN1.setObjectName(u"lb_gN1")
-        self.lb_gN1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_gN3 = QLabel(self.tab_layout)
+        self.lb_gN3.setObjectName(u"lb_gN3")
+        self.lb_gN3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_gN1, 3, 4, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_gN3, 5, 4, 1, 1)
 
-        self.lb_icon1 = QLabel(self.tab_layout)
-        self.lb_icon1.setObjectName(u"lb_icon1")
-        self.lb_icon1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_gear = QLabel(self.tab_layout)
+        self.lb_gear.setObjectName(u"lb_gear")
+        self.lb_gear.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_icon1, 3, 8, 1, 1)
-
-        self.lb_GR1 = QLabel(self.tab_layout)
-        self.lb_GR1.setObjectName(u"lb_GR1")
-        self.lb_GR1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_GR1, 3, 5, 1, 1)
-
-        self.line_5 = QFrame(self.tab_layout)
-        self.line_5.setObjectName(u"line_5")
-        self.line_5.setFrameShape(QFrame.Shape.HLine)
-        self.line_5.setFrameShadow(QFrame.Shadow.Sunken)
-
-        self.gridLayout_2.addWidget(self.line_5, 0, 0, 1, 11)
-
-        self.lb_width5 = QLabel(self.tab_layout)
-        self.lb_width5.setObjectName(u"lb_width5")
-        self.lb_width5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_width5, 7, 7, 1, 1)
-
-        self.lb_gN2 = QLabel(self.tab_layout)
-        self.lb_gN2.setObjectName(u"lb_gN2")
-        self.lb_gN2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_gN2, 4, 4, 1, 1)
-
-        self.lb_GearRatio = QLabel(self.tab_layout)
-        self.lb_GearRatio.setObjectName(u"lb_GearRatio")
-        self.lb_GearRatio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.gridLayout_2.addWidget(self.lb_GearRatio, 1, 5, 1, 1)
-
-        self.lb_width1 = QLabel(self.tab_layout)
-        self.lb_width1.setObjectName(u"lb_width1")
-        self.lb_width1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_width1, 3, 7, 1, 1)
-
-        self.lb_CD5 = QLabel(self.tab_layout)
-        self.lb_CD5.setObjectName(u"lb_CD5")
-        self.lb_CD5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_CD5, 7, 6, 1, 1)
-
-        self.pb_useLayout = QPushButton(self.tab_layout)
-        self.pb_useLayout.setObjectName(u"pb_useLayout")
-
-        self.gridLayout_2.addWidget(self.pb_useLayout, 8, 7, 1, 4)
-
-        self.lb_icon3 = QLabel(self.tab_layout)
-        self.lb_icon3.setObjectName(u"lb_icon3")
-        self.lb_icon3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_icon3, 5, 8, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_gear, 3, 3, 5, 1)
 
         self.line_8 = QFrame(self.tab_layout)
         self.line_8.setObjectName(u"line_8")
@@ -244,11 +211,30 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.line_8, 3, 2, 5, 1)
 
-        self.lb_GR4 = QLabel(self.tab_layout)
-        self.lb_GR4.setObjectName(u"lb_GR4")
-        self.lb_GR4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.line_6 = QFrame(self.tab_layout)
+        self.line_6.setObjectName(u"line_6")
+        self.line_6.setFrameShape(QFrame.Shape.HLine)
+        self.line_6.setFrameShadow(QFrame.Shadow.Sunken)
 
-        self.gridLayout_2.addWidget(self.lb_GR4, 6, 5, 1, 1)
+        self.gridLayout_2.addWidget(self.line_6, 2, 0, 1, 11)
+
+        self.lb_GR1 = QLabel(self.tab_layout)
+        self.lb_GR1.setObjectName(u"lb_GR1")
+        self.lb_GR1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_GR1, 3, 5, 1, 1)
+
+        self.lb_icon3 = QLabel(self.tab_layout)
+        self.lb_icon3.setObjectName(u"lb_icon3")
+        self.lb_icon3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_icon3, 5, 8, 1, 1)
+
+        self.lb_icon5 = QLabel(self.tab_layout)
+        self.lb_icon5.setObjectName(u"lb_icon5")
+        self.lb_icon5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_icon5, 7, 8, 1, 1)
 
         self.rb_1 = QRadioButton(self.tab_layout)
         self.buttonGroup.addButton(self.rb_1)
@@ -257,29 +243,47 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.rb_1, 3, 10, 1, 1)
 
+        self.lb_icon4 = QLabel(self.tab_layout)
+        self.lb_icon4.setObjectName(u"lb_icon4")
+        self.lb_icon4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_icon4, 6, 8, 1, 1)
+
+        self.lb_pinion = QLabel(self.tab_layout)
+        self.lb_pinion.setObjectName(u"lb_pinion")
+        self.lb_pinion.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_pinion, 3, 0, 5, 1)
+
+        self.lb_width5 = QLabel(self.tab_layout)
+        self.lb_width5.setObjectName(u"lb_width5")
+        self.lb_width5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_width5, 7, 7, 1, 1)
+
+        self.lb_width1 = QLabel(self.tab_layout)
+        self.lb_width1.setObjectName(u"lb_width1")
+        self.lb_width1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_width1, 3, 7, 1, 1)
+
+        self.lb_icon2 = QLabel(self.tab_layout)
+        self.lb_icon2.setObjectName(u"lb_icon2")
+        self.lb_icon2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_icon2, 4, 8, 1, 1)
+
+        self.lb_CD3 = QLabel(self.tab_layout)
+        self.lb_CD3.setObjectName(u"lb_CD3")
+        self.lb_CD3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_CD3, 5, 6, 1, 1)
+
         self.lb_CD2 = QLabel(self.tab_layout)
         self.lb_CD2.setObjectName(u"lb_CD2")
         self.lb_CD2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
         self.gridLayout_2.addWidget(self.lb_CD2, 4, 6, 1, 1)
-
-        self.lb_icon5 = QLabel(self.tab_layout)
-        self.lb_icon5.setObjectName(u"lb_icon5")
-        self.lb_icon5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_icon5, 7, 8, 1, 1)
-
-        self.lb_width3 = QLabel(self.tab_layout)
-        self.lb_width3.setObjectName(u"lb_width3")
-        self.lb_width3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_width3, 5, 7, 1, 1)
-
-        self.lb_width4 = QLabel(self.tab_layout)
-        self.lb_width4.setObjectName(u"lb_width4")
-        self.lb_width4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_width4, 6, 7, 1, 1)
 
         self.lb_teeth = QLabel(self.tab_layout)
         self.lb_teeth.setObjectName(u"lb_teeth")
@@ -293,24 +297,41 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.lb_teeth_2, 1, 1, 1, 1)
 
-        self.rb_4 = QRadioButton(self.tab_layout)
-        self.buttonGroup.addButton(self.rb_4)
-        self.rb_4.setObjectName(u"rb_4")
-        self.rb_4.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-
-        self.gridLayout_2.addWidget(self.rb_4, 6, 10, 1, 1)
-
-        self.lb_icon2 = QLabel(self.tab_layout)
-        self.lb_icon2.setObjectName(u"lb_icon2")
-        self.lb_icon2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_icon2, 4, 8, 1, 1)
-
         self.lb_gN5 = QLabel(self.tab_layout)
         self.lb_gN5.setObjectName(u"lb_gN5")
         self.lb_gN5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
         self.gridLayout_2.addWidget(self.lb_gN5, 7, 4, 1, 1)
+
+        self.lb_CenterDistance = QLabel(self.tab_layout)
+        self.lb_CenterDistance.setObjectName(u"lb_CenterDistance")
+        self.lb_CenterDistance.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.gridLayout_2.addWidget(self.lb_CenterDistance, 1, 6, 1, 1)
+
+        self.lb_GR2 = QLabel(self.tab_layout)
+        self.lb_GR2.setObjectName(u"lb_GR2")
+        self.lb_GR2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_GR2, 4, 5, 1, 1)
+
+        self.lb_GR4 = QLabel(self.tab_layout)
+        self.lb_GR4.setObjectName(u"lb_GR4")
+        self.lb_GR4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_GR4, 6, 5, 1, 1)
+
+        self.lb_width4 = QLabel(self.tab_layout)
+        self.lb_width4.setObjectName(u"lb_width4")
+        self.lb_width4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_width4, 6, 7, 1, 1)
+
+        self.lb_GearRatio = QLabel(self.tab_layout)
+        self.lb_GearRatio.setObjectName(u"lb_GearRatio")
+        self.lb_GearRatio.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.gridLayout_2.addWidget(self.lb_GearRatio, 1, 5, 1, 1)
 
         self.lb_OverallWidth = QLabel(self.tab_layout)
         self.lb_OverallWidth.setObjectName(u"lb_OverallWidth")
@@ -318,42 +339,62 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.lb_OverallWidth, 1, 7, 1, 1)
 
-        self.rb_5 = QRadioButton(self.tab_layout)
-        self.buttonGroup.addButton(self.rb_5)
-        self.rb_5.setObjectName(u"rb_5")
-        self.rb_5.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.lb_gN1 = QLabel(self.tab_layout)
+        self.lb_gN1.setObjectName(u"lb_gN1")
+        self.lb_gN1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.rb_5, 7, 10, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_gN1, 3, 4, 1, 1)
 
-        self.lb_icon4 = QLabel(self.tab_layout)
-        self.lb_icon4.setObjectName(u"lb_icon4")
-        self.lb_icon4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.rb_4 = QRadioButton(self.tab_layout)
+        self.buttonGroup.addButton(self.rb_4)
+        self.rb_4.setObjectName(u"rb_4")
+        self.rb_4.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
-        self.gridLayout_2.addWidget(self.lb_icon4, 6, 8, 1, 1)
+        self.gridLayout_2.addWidget(self.rb_4, 6, 10, 1, 1)
 
-        self.lb_GR5 = QLabel(self.tab_layout)
-        self.lb_GR5.setObjectName(u"lb_GR5")
-        self.lb_GR5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.rb_3 = QRadioButton(self.tab_layout)
+        self.buttonGroup.addButton(self.rb_3)
+        self.rb_3.setObjectName(u"rb_3")
+        self.rb_3.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.rb_3.setChecked(True)
 
-        self.gridLayout_2.addWidget(self.lb_GR5, 7, 5, 1, 1)
+        self.gridLayout_2.addWidget(self.rb_3, 5, 10, 1, 1)
 
-        self.lb_CD1 = QLabel(self.tab_layout)
-        self.lb_CD1.setObjectName(u"lb_CD1")
-        self.lb_CD1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_CD5 = QLabel(self.tab_layout)
+        self.lb_CD5.setObjectName(u"lb_CD5")
+        self.lb_CD5.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_CD1, 3, 6, 1, 1)
-
-        self.lb_width2 = QLabel(self.tab_layout)
-        self.lb_width2.setObjectName(u"lb_width2")
-        self.lb_width2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_width2, 4, 7, 1, 1)
+        self.gridLayout_2.addWidget(self.lb_CD5, 7, 6, 1, 1)
 
         self.lb_CD4 = QLabel(self.tab_layout)
         self.lb_CD4.setObjectName(u"lb_CD4")
         self.lb_CD4.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
         self.gridLayout_2.addWidget(self.lb_CD4, 6, 6, 1, 1)
+
+        self.line_7 = QFrame(self.tab_layout)
+        self.line_7.setObjectName(u"line_7")
+        self.line_7.setFrameShape(QFrame.Shape.VLine)
+        self.line_7.setFrameShadow(QFrame.Shadow.Sunken)
+
+        self.gridLayout_2.addWidget(self.line_7, 3, 9, 5, 1)
+
+        self.lb_GR3 = QLabel(self.tab_layout)
+        self.lb_GR3.setObjectName(u"lb_GR3")
+        self.lb_GR3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_GR3, 5, 5, 1, 1)
+
+        self.pb_useLayout = QPushButton(self.tab_layout)
+        self.pb_useLayout.setObjectName(u"pb_useLayout")
+
+        self.gridLayout_2.addWidget(self.pb_useLayout, 8, 7, 1, 4)
+
+        self.lb_width3 = QLabel(self.tab_layout)
+        self.lb_width3.setObjectName(u"lb_width3")
+        self.lb_width3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+
+        self.gridLayout_2.addWidget(self.lb_width3, 5, 7, 1, 1)
 
         self.le_pN = QLineEdit(self.tab_layout)
         self.le_pN.setObjectName(u"le_pN")
@@ -367,55 +408,37 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_2.addWidget(self.le_pN, 5, 1, 1, 1)
 
-        self.lb_gear = QLabel(self.tab_layout)
-        self.lb_gear.setObjectName(u"lb_gear")
-        self.lb_gear.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_gN2 = QLabel(self.tab_layout)
+        self.lb_gN2.setObjectName(u"lb_gN2")
+        self.lb_gN2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_gear, 3, 3, 5, 1)
+        self.gridLayout_2.addWidget(self.lb_gN2, 4, 4, 1, 1)
 
-        self.lb_CD3 = QLabel(self.tab_layout)
-        self.lb_CD3.setObjectName(u"lb_CD3")
-        self.lb_CD3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.rb_5 = QRadioButton(self.tab_layout)
+        self.buttonGroup.addButton(self.rb_5)
+        self.rb_5.setObjectName(u"rb_5")
+        self.rb_5.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
-        self.gridLayout_2.addWidget(self.lb_CD3, 5, 6, 1, 1)
+        self.gridLayout_2.addWidget(self.rb_5, 7, 10, 1, 1)
 
-        self.line_6 = QFrame(self.tab_layout)
-        self.line_6.setObjectName(u"line_6")
-        self.line_6.setFrameShape(QFrame.Shape.HLine)
-        self.line_6.setFrameShadow(QFrame.Shadow.Sunken)
+        self.lb_CD1 = QLabel(self.tab_layout)
+        self.lb_CD1.setObjectName(u"lb_CD1")
+        self.lb_CD1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.line_6, 2, 0, 1, 11)
+        self.gridLayout_2.addWidget(self.lb_CD1, 3, 6, 1, 1)
 
-        self.lb_pinion = QLabel(self.tab_layout)
-        self.lb_pinion.setObjectName(u"lb_pinion")
-        self.lb_pinion.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_icon1 = QLabel(self.tab_layout)
+        self.lb_icon1.setObjectName(u"lb_icon1")
+        self.lb_icon1.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_2.addWidget(self.lb_pinion, 3, 0, 5, 1)
+        self.gridLayout_2.addWidget(self.lb_icon1, 3, 8, 1, 1)
 
-        self.lb_GR3 = QLabel(self.tab_layout)
-        self.lb_GR3.setObjectName(u"lb_GR3")
-        self.lb_GR3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.line_5 = QFrame(self.tab_layout)
+        self.line_5.setObjectName(u"line_5")
+        self.line_5.setFrameShape(QFrame.Shape.HLine)
+        self.line_5.setFrameShadow(QFrame.Shadow.Sunken)
 
-        self.gridLayout_2.addWidget(self.lb_GR3, 5, 5, 1, 1)
-
-        self.lb_gN3 = QLabel(self.tab_layout)
-        self.lb_gN3.setObjectName(u"lb_gN3")
-        self.lb_gN3.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_gN3, 5, 4, 1, 1)
-
-        self.lb_GR2 = QLabel(self.tab_layout)
-        self.lb_GR2.setObjectName(u"lb_GR2")
-        self.lb_GR2.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
-
-        self.gridLayout_2.addWidget(self.lb_GR2, 4, 5, 1, 1)
-
-        self.line_7 = QFrame(self.tab_layout)
-        self.line_7.setObjectName(u"line_7")
-        self.line_7.setFrameShape(QFrame.Shape.VLine)
-        self.line_7.setFrameShadow(QFrame.Shadow.Sunken)
-
-        self.gridLayout_2.addWidget(self.line_7, 3, 9, 5, 1)
+        self.gridLayout_2.addWidget(self.line_5, 0, 0, 1, 11)
 
 
         self.horizontalLayout_4.addLayout(self.gridLayout_2)
@@ -472,31 +495,31 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.lb_CD_value, 27, 2, 1, 1)
 
-        self.lb_bkl_units = QLabel(self.tab_GD)
-        self.lb_bkl_units.setObjectName(u"lb_bkl_units")
-        sizePolicy2.setHeightForWidth(self.lb_bkl_units.sizePolicy().hasHeightForWidth())
-        self.lb_bkl_units.setSizePolicy(sizePolicy2)
-        self.lb_bkl_units.setFont(font)
-        self.lb_bkl_units.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_bkl_unit = QLabel(self.tab_GD)
+        self.lb_bkl_unit.setObjectName(u"lb_bkl_unit")
+        sizePolicy2.setHeightForWidth(self.lb_bkl_unit.sizePolicy().hasHeightForWidth())
+        self.lb_bkl_unit.setSizePolicy(sizePolicy2)
+        self.lb_bkl_unit.setFont(font)
+        self.lb_bkl_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.lb_bkl_units, 28, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_bkl_unit, 28, 1, 1, 1)
 
-        self.label_45 = QLabel(self.tab_GD)
-        self.label_45.setObjectName(u"label_45")
-        sizePolicy2.setHeightForWidth(self.label_45.sizePolicy().hasHeightForWidth())
-        self.label_45.setSizePolicy(sizePolicy2)
-        self.label_45.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_rtcl_unit = QLabel(self.tab_GD)
+        self.lb_rtcl_unit.setObjectName(u"lb_rtcl_unit")
+        sizePolicy2.setHeightForWidth(self.lb_rtcl_unit.sizePolicy().hasHeightForWidth())
+        self.lb_rtcl_unit.setSizePolicy(sizePolicy2)
+        self.lb_rtcl_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_45, 19, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_rtcl_unit, 19, 1, 1, 1)
 
-        self.label_57 = QLabel(self.tab_GD)
-        self.label_57.setObjectName(u"label_57")
-        sizePolicy2.setHeightForWidth(self.label_57.sizePolicy().hasHeightForWidth())
-        self.label_57.setSizePolicy(sizePolicy2)
-        self.label_57.setFont(font)
-        self.label_57.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rtip_unit = QLabel(self.tab_GD)
+        self.lb_Rtip_unit.setObjectName(u"lb_Rtip_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rtip_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rtip_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rtip_unit.setFont(font)
+        self.lb_Rtip_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_57, 15, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rtip_unit, 15, 1, 1, 1)
 
         self.label_16 = QLabel(self.tab_GD)
         self.label_16.setObjectName(u"label_16")
@@ -518,14 +541,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.line_11, 25, 0, 1, 4)
 
-        self.label_65 = QLabel(self.tab_GD)
-        self.label_65.setObjectName(u"label_65")
-        sizePolicy2.setHeightForWidth(self.label_65.sizePolicy().hasHeightForWidth())
-        self.label_65.setSizePolicy(sizePolicy2)
-        self.label_65.setFont(font)
-        self.label_65.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rr_unit = QLabel(self.tab_GD)
+        self.lb_Rr_unit.setObjectName(u"lb_Rr_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rr_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rr_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rr_unit.setFont(font)
+        self.lb_Rr_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_65, 21, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rr_unit, 21, 1, 1, 1)
 
         self.le_x1 = QLineEdit(self.tab_GD)
         self.le_x1.setObjectName(u"le_x1")
@@ -634,13 +657,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.lb_Roe1, 17, 2, 1, 1)
 
-        self.label_27 = QLabel(self.tab_GD)
-        self.label_27.setObjectName(u"label_27")
-        sizePolicy2.setHeightForWidth(self.label_27.sizePolicy().hasHeightForWidth())
-        self.label_27.setSizePolicy(sizePolicy2)
-        self.label_27.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Ro_unit = QLabel(self.tab_GD)
+        self.lb_Ro_unit.setObjectName(u"lb_Ro_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Ro_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Ro_unit.setSizePolicy(sizePolicy2)
+        self.lb_Ro_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_27, 12, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Ro_unit, 12, 1, 1, 1)
 
         self.label_30 = QLabel(self.tab_GD)
         self.label_30.setObjectName(u"label_30")
@@ -658,14 +681,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.le_Ro2, 12, 3, 1, 1)
 
-        self.label_31 = QLabel(self.tab_GD)
-        self.label_31.setObjectName(u"label_31")
-        sizePolicy2.setHeightForWidth(self.label_31.sizePolicy().hasHeightForWidth())
-        self.label_31.setSizePolicy(sizePolicy2)
-        self.label_31.setFont(font)
-        self.label_31.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Ros_unit = QLabel(self.tab_GD)
+        self.lb_Ros_unit.setObjectName(u"lb_Ros_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Ros_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Ros_unit.setSizePolicy(sizePolicy2)
+        self.lb_Ros_unit.setFont(font)
+        self.lb_Ros_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_31, 13, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Ros_unit, 13, 1, 1, 1)
 
         self.lb_tt2 = QLabel(self.tab_GD)
         self.lb_tt2.setObjectName(u"lb_tt2")
@@ -748,14 +771,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_50, 8, 0, 1, 1)
 
-        self.label_53 = QLabel(self.tab_GD)
-        self.label_53.setObjectName(u"label_53")
-        sizePolicy2.setHeightForWidth(self.label_53.sizePolicy().hasHeightForWidth())
-        self.label_53.setSizePolicy(sizePolicy2)
-        self.label_53.setFont(font)
-        self.label_53.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rtipmax_unit = QLabel(self.tab_GD)
+        self.lb_Rtipmax_unit.setObjectName(u"lb_Rtipmax_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rtipmax_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rtipmax_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rtipmax_unit.setFont(font)
+        self.lb_Rtipmax_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_53, 16, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rtipmax_unit, 16, 1, 1, 1)
 
         self.label_58 = QLabel(self.tab_GD)
         self.label_58.setObjectName(u"label_58")
@@ -766,13 +789,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_58, 26, 0, 1, 1)
 
-        self.label_24 = QLabel(self.tab_GD)
-        self.label_24.setObjectName(u"label_24")
-        sizePolicy2.setHeightForWidth(self.label_24.sizePolicy().hasHeightForWidth())
-        self.label_24.setSizePolicy(sizePolicy2)
-        self.label_24.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rf_unit = QLabel(self.tab_GD)
+        self.lb_Rf_unit.setObjectName(u"lb_Rf_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rf_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rf_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rf_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_24, 23, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rf_unit, 23, 1, 1, 1)
 
         self.cb_CD_bkl = QComboBox(self.tab_GD)
         self.cb_CD_bkl.addItem("")
@@ -790,13 +813,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_29, 2, 1, 1, 1)
 
-        self.label_15 = QLabel(self.tab_GD)
-        self.label_15.setObjectName(u"label_15")
-        sizePolicy2.setHeightForWidth(self.label_15.sizePolicy().hasHeightForWidth())
-        self.label_15.setSizePolicy(sizePolicy2)
-        self.label_15.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.lb_Rf = QLabel(self.tab_GD)
+        self.lb_Rf.setObjectName(u"lb_Rf")
+        sizePolicy2.setHeightForWidth(self.lb_Rf.sizePolicy().hasHeightForWidth())
+        self.lb_Rf.setSizePolicy(sizePolicy2)
+        self.lb_Rf.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout.addWidget(self.label_15, 23, 0, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rf, 23, 0, 1, 1)
 
         self.label_46 = QLabel(self.tab_GD)
         self.label_46.setObjectName(u"label_46")
@@ -816,22 +839,22 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.lb_Rp1, 8, 2, 1, 1)
 
-        self.label_39 = QLabel(self.tab_GD)
-        self.label_39.setObjectName(u"label_39")
-        sizePolicy2.setHeightForWidth(self.label_39.sizePolicy().hasHeightForWidth())
-        self.label_39.setSizePolicy(sizePolicy2)
-        self.label_39.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_mod_unit = QLabel(self.tab_GD)
+        self.lb_mod_unit.setObjectName(u"lb_mod_unit")
+        sizePolicy2.setHeightForWidth(self.lb_mod_unit.sizePolicy().hasHeightForWidth())
+        self.lb_mod_unit.setSizePolicy(sizePolicy2)
+        self.lb_mod_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_39, 1, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_mod_unit, 1, 1, 1, 1)
 
-        self.label_51 = QLabel(self.tab_GD)
-        self.label_51.setObjectName(u"label_51")
-        sizePolicy2.setHeightForWidth(self.label_51.sizePolicy().hasHeightForWidth())
-        self.label_51.setSizePolicy(sizePolicy2)
-        self.label_51.setFont(font)
-        self.label_51.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rff_unit = QLabel(self.tab_GD)
+        self.lb_Rff_unit.setObjectName(u"lb_Rff_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rff_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rff_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rff_unit.setFont(font)
+        self.lb_Rff_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_51, 24, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rff_unit, 24, 1, 1, 1)
 
         self.lb_tt1 = QLabel(self.tab_GD)
         self.lb_tt1.setObjectName(u"lb_tt1")
@@ -877,14 +900,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_32, 13, 0, 1, 1)
 
-        self.label_44 = QLabel(self.tab_GD)
-        self.label_44.setObjectName(u"label_44")
-        sizePolicy2.setHeightForWidth(self.label_44.sizePolicy().hasHeightForWidth())
-        self.label_44.setSizePolicy(sizePolicy2)
-        self.label_44.setFont(font)
-        self.label_44.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rs_unit = QLabel(self.tab_GD)
+        self.lb_Rs_unit.setObjectName(u"lb_Rs_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rs_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rs_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rs_unit.setFont(font)
+        self.lb_Rs_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_44, 7, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rs_unit, 7, 1, 1, 1)
 
         self.lb_Rff2 = QLabel(self.tab_GD)
         self.lb_Rff2.setObjectName(u"lb_Rff2")
@@ -904,14 +927,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.lb_Ros2, 13, 3, 1, 1)
 
-        self.label_42 = QLabel(self.tab_GD)
-        self.label_42.setObjectName(u"label_42")
-        sizePolicy2.setHeightForWidth(self.label_42.sizePolicy().hasHeightForWidth())
-        self.label_42.setSizePolicy(sizePolicy2)
-        self.label_42.setFont(font)
-        self.label_42.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_tts_unit = QLabel(self.tab_GD)
+        self.lb_tts_unit.setObjectName(u"lb_tts_unit")
+        sizePolicy2.setHeightForWidth(self.lb_tts_unit.sizePolicy().hasHeightForWidth())
+        self.lb_tts_unit.setSizePolicy(sizePolicy2)
+        self.lb_tts_unit.setFont(font)
+        self.lb_tts_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_42, 9, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_tts_unit, 9, 1, 1, 1)
 
         self.label_59 = QLabel(self.tab_GD)
         self.label_59.setObjectName(u"label_59")
@@ -939,14 +962,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.le_mod, 1, 2, 1, 1)
 
-        self.label_48 = QLabel(self.tab_GD)
-        self.label_48.setObjectName(u"label_48")
-        sizePolicy2.setHeightForWidth(self.label_48.sizePolicy().hasHeightForWidth())
-        self.label_48.setSizePolicy(sizePolicy2)
-        self.label_48.setFont(font)
-        self.label_48.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_tt_unit = QLabel(self.tab_GD)
+        self.lb_tt_unit.setObjectName(u"lb_tt_unit")
+        sizePolicy2.setHeightForWidth(self.lb_tt_unit.sizePolicy().hasHeightForWidth())
+        self.lb_tt_unit.setSizePolicy(sizePolicy2)
+        self.lb_tt_unit.setFont(font)
+        self.lb_tt_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_48, 10, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_tt_unit, 10, 1, 1, 1)
 
         self.lb_Rtipmax1 = QLabel(self.tab_GD)
         self.lb_Rtipmax1.setObjectName(u"lb_Rtipmax1")
@@ -1071,14 +1094,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.lb_Rs1, 7, 2, 1, 1)
 
-        self.label_35 = QLabel(self.tab_GD)
-        self.label_35.setObjectName(u"label_35")
-        sizePolicy2.setHeightForWidth(self.label_35.sizePolicy().hasHeightForWidth())
-        self.label_35.setSizePolicy(sizePolicy2)
-        self.label_35.setFont(font)
-        self.label_35.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Romax_unit = QLabel(self.tab_GD)
+        self.lb_Romax_unit.setObjectName(u"lb_Romax_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Romax_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Romax_unit.setSizePolicy(sizePolicy2)
+        self.lb_Romax_unit.setFont(font)
+        self.lb_Romax_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_35, 14, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Romax_unit, 14, 1, 1, 1)
 
         self.lb_Rr2 = QLabel(self.tab_GD)
         self.lb_Rr2.setObjectName(u"lb_Rr2")
@@ -1131,14 +1154,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.le_N2, 5, 3, 1, 1)
 
-        self.lb_CD_units = QLabel(self.tab_GD)
-        self.lb_CD_units.setObjectName(u"lb_CD_units")
-        sizePolicy2.setHeightForWidth(self.lb_CD_units.sizePolicy().hasHeightForWidth())
-        self.lb_CD_units.setSizePolicy(sizePolicy2)
-        self.lb_CD_units.setFont(font)
-        self.lb_CD_units.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_CD_unit = QLabel(self.tab_GD)
+        self.lb_CD_unit.setObjectName(u"lb_CD_unit")
+        sizePolicy2.setHeightForWidth(self.lb_CD_unit.sizePolicy().hasHeightForWidth())
+        self.lb_CD_unit.setSizePolicy(sizePolicy2)
+        self.lb_CD_unit.setFont(font)
+        self.lb_CD_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.lb_CD_units, 27, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_CD_unit, 27, 1, 1, 1)
 
         self.line_9 = QFrame(self.tab_GD)
         self.line_9.setObjectName(u"line_9")
@@ -1175,14 +1198,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.line_2, 31, 0, 1, 4)
 
-        self.label_41 = QLabel(self.tab_GD)
-        self.label_41.setObjectName(u"label_41")
-        sizePolicy2.setHeightForWidth(self.label_41.sizePolicy().hasHeightForWidth())
-        self.label_41.setSizePolicy(sizePolicy2)
-        self.label_41.setFont(font)
-        self.label_41.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rp_unit = QLabel(self.tab_GD)
+        self.lb_Rp_unit.setObjectName(u"lb_Rp_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rp_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rp_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rp_unit.setFont(font)
+        self.lb_Rp_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_41, 8, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rp_unit, 8, 1, 1, 1)
 
         self.label_22 = QLabel(self.tab_GD)
         self.label_22.setObjectName(u"label_22")
@@ -1226,13 +1249,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_60, 26, 1, 1, 1)
 
-        self.label_25 = QLabel(self.tab_GD)
-        self.label_25.setObjectName(u"label_25")
-        sizePolicy2.setHeightForWidth(self.label_25.sizePolicy().hasHeightForWidth())
-        self.label_25.setSizePolicy(sizePolicy2)
-        self.label_25.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_CD_bkl_unit = QLabel(self.tab_GD)
+        self.lb_CD_bkl_unit.setObjectName(u"lb_CD_bkl_unit")
+        sizePolicy2.setHeightForWidth(self.lb_CD_bkl_unit.sizePolicy().hasHeightForWidth())
+        self.lb_CD_bkl_unit.setSizePolicy(sizePolicy2)
+        self.lb_CD_bkl_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_25, 3, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_CD_bkl_unit, 3, 1, 1, 1)
 
         self.le_Rf1 = QLineEdit(self.tab_GD)
         self.le_Rf1.setObjectName(u"le_Rf1")
@@ -1276,14 +1299,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.le_Rf2, 23, 3, 1, 1)
 
-        self.label_28 = QLabel(self.tab_GD)
-        self.label_28.setObjectName(u"label_28")
-        sizePolicy2.setHeightForWidth(self.label_28.sizePolicy().hasHeightForWidth())
-        self.label_28.setSizePolicy(sizePolicy2)
-        self.label_28.setFont(font)
-        self.label_28.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Roe_unit = QLabel(self.tab_GD)
+        self.lb_Roe_unit.setObjectName(u"lb_Roe_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Roe_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Roe_unit.setSizePolicy(sizePolicy2)
+        self.lb_Roe_unit.setFont(font)
+        self.lb_Roe_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_28, 17, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Roe_unit, 17, 1, 1, 1)
 
         self.label_66 = QLabel(self.tab_GD)
         self.label_66.setObjectName(u"label_66")
@@ -1294,14 +1317,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout.addWidget(self.label_66, 20, 0, 1, 1)
 
-        self.label_67 = QLabel(self.tab_GD)
-        self.label_67.setObjectName(u"label_67")
-        sizePolicy2.setHeightForWidth(self.label_67.sizePolicy().hasHeightForWidth())
-        self.label_67.setSizePolicy(sizePolicy2)
-        self.label_67.setFont(font)
-        self.label_67.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_Rrs_unit = QLabel(self.tab_GD)
+        self.lb_Rrs_unit.setObjectName(u"lb_Rrs_unit")
+        sizePolicy2.setHeightForWidth(self.lb_Rrs_unit.sizePolicy().hasHeightForWidth())
+        self.lb_Rrs_unit.setSizePolicy(sizePolicy2)
+        self.lb_Rrs_unit.setFont(font)
+        self.lb_Rrs_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout.addWidget(self.label_67, 20, 1, 1, 1)
+        self.gridLayout.addWidget(self.lb_Rrs_unit, 20, 1, 1, 1)
 
         self.lb_Rrs1 = QLabel(self.tab_GD)
         self.lb_Rrs1.setObjectName(u"lb_Rrs1")
@@ -1498,14 +1521,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.le_torque, 4, 2, 1, 1)
 
-        self.label_77 = QLabel(self.tab_stress)
-        self.label_77.setObjectName(u"label_77")
-        sizePolicy2.setHeightForWidth(self.label_77.sizePolicy().hasHeightForWidth())
-        self.label_77.setSizePolicy(sizePolicy2)
-        self.label_77.setFont(font)
-        self.label_77.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_stressB_unit = QLabel(self.tab_stress)
+        self.lb_stressB_unit.setObjectName(u"lb_stressB_unit")
+        sizePolicy2.setHeightForWidth(self.lb_stressB_unit.sizePolicy().hasHeightForWidth())
+        self.lb_stressB_unit.setSizePolicy(sizePolicy2)
+        self.lb_stressB_unit.setFont(font)
+        self.lb_stressB_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_77, 11, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_stressB_unit, 11, 1, 1, 1)
 
         self.label_84 = QLabel(self.tab_stress)
         self.label_84.setObjectName(u"label_84")
@@ -1548,14 +1571,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.le_FW1, 7, 2, 1, 1)
 
-        self.label_79 = QLabel(self.tab_stress)
-        self.label_79.setObjectName(u"label_79")
-        sizePolicy2.setHeightForWidth(self.label_79.sizePolicy().hasHeightForWidth())
-        self.label_79.setSizePolicy(sizePolicy2)
-        self.label_79.setFont(font)
-        self.label_79.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_stressC_unit = QLabel(self.tab_stress)
+        self.lb_stressC_unit.setObjectName(u"lb_stressC_unit")
+        sizePolicy2.setHeightForWidth(self.lb_stressC_unit.sizePolicy().hasHeightForWidth())
+        self.lb_stressC_unit.setSizePolicy(sizePolicy2)
+        self.lb_stressC_unit.setFont(font)
+        self.lb_stressC_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_79, 12, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_stressC_unit, 12, 1, 1, 1)
 
         self.le_FW2 = QLineEdit(self.tab_stress)
         self.le_FW2.setObjectName(u"le_FW2")
@@ -1574,13 +1597,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.line_15, 10, 0, 1, 4)
 
-        self.label_63 = QLabel(self.tab_stress)
-        self.label_63.setObjectName(u"label_63")
-        sizePolicy2.setHeightForWidth(self.label_63.sizePolicy().hasHeightForWidth())
-        self.label_63.setSizePolicy(sizePolicy2)
-        self.label_63.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_E_unit = QLabel(self.tab_stress)
+        self.lb_E_unit.setObjectName(u"lb_E_unit")
+        sizePolicy2.setHeightForWidth(self.lb_E_unit.sizePolicy().hasHeightForWidth())
+        self.lb_E_unit.setSizePolicy(sizePolicy2)
+        self.lb_E_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_63, 8, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_E_unit, 8, 1, 1, 1)
 
         self.label_82 = QLabel(self.tab_stress)
         self.label_82.setObjectName(u"label_82")
@@ -1590,13 +1613,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.label_82, 6, 3, 1, 1)
 
-        self.le_speed = QLineEdit(self.tab_stress)
-        self.le_speed.setObjectName(u"le_speed")
-        sizePolicy3.setHeightForWidth(self.le_speed.sizePolicy().hasHeightForWidth())
-        self.le_speed.setSizePolicy(sizePolicy3)
-        self.le_speed.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
+        self.le_RPM = QLineEdit(self.tab_stress)
+        self.le_RPM.setObjectName(u"le_RPM")
+        sizePolicy3.setHeightForWidth(self.le_RPM.sizePolicy().hasHeightForWidth())
+        self.le_RPM.setSizePolicy(sizePolicy3)
+        self.le_RPM.setAlignment(Qt.AlignmentFlag.AlignRight|Qt.AlignmentFlag.AlignTrailing|Qt.AlignmentFlag.AlignVCenter)
 
-        self.gridLayout_3.addWidget(self.le_speed, 3, 2, 1, 1)
+        self.gridLayout_3.addWidget(self.le_RPM, 3, 2, 1, 1)
 
         self.label_37 = QLabel(self.tab_stress)
         self.label_37.setObjectName(u"label_37")
@@ -1614,13 +1637,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.label_87, 9, 0, 1, 1)
 
-        self.label_56 = QLabel(self.tab_stress)
-        self.label_56.setObjectName(u"label_56")
-        sizePolicy2.setHeightForWidth(self.label_56.sizePolicy().hasHeightForWidth())
-        self.label_56.setSizePolicy(sizePolicy2)
-        self.label_56.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_FW_unit = QLabel(self.tab_stress)
+        self.lb_FW_unit.setObjectName(u"lb_FW_unit")
+        sizePolicy2.setHeightForWidth(self.lb_FW_unit.sizePolicy().hasHeightForWidth())
+        self.lb_FW_unit.setSizePolicy(sizePolicy2)
+        self.lb_FW_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_56, 7, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_FW_unit, 7, 1, 1, 1)
 
         self.lb_stressB1 = QLabel(self.tab_stress)
         self.lb_stressB1.setObjectName(u"lb_stressB1")
@@ -1682,13 +1705,13 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.le_nu1, 9, 2, 1, 1)
 
-        self.label_61 = QLabel(self.tab_stress)
-        self.label_61.setObjectName(u"label_61")
-        sizePolicy2.setHeightForWidth(self.label_61.sizePolicy().hasHeightForWidth())
-        self.label_61.setSizePolicy(sizePolicy2)
-        self.label_61.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_torque_unit = QLabel(self.tab_stress)
+        self.lb_torque_unit.setObjectName(u"lb_torque_unit")
+        sizePolicy2.setHeightForWidth(self.lb_torque_unit.sizePolicy().hasHeightForWidth())
+        self.lb_torque_unit.setSizePolicy(sizePolicy2)
+        self.lb_torque_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_61, 4, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_torque_unit, 4, 1, 1, 1)
 
         self.line_14 = QFrame(self.tab_stress)
         self.line_14.setObjectName(u"line_14")
@@ -1734,14 +1757,14 @@ class Ui_jpgearqt(object):
 
         self.gridLayout_3.addWidget(self.label_80, 13, 0, 1, 1)
 
-        self.label_81 = QLabel(self.tab_stress)
-        self.label_81.setObjectName(u"label_81")
-        sizePolicy2.setHeightForWidth(self.label_81.sizePolicy().hasHeightForWidth())
-        self.label_81.setSizePolicy(sizePolicy2)
-        self.label_81.setFont(font)
-        self.label_81.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lb_pitchLineVel_unit = QLabel(self.tab_stress)
+        self.lb_pitchLineVel_unit.setObjectName(u"lb_pitchLineVel_unit")
+        sizePolicy2.setHeightForWidth(self.lb_pitchLineVel_unit.sizePolicy().hasHeightForWidth())
+        self.lb_pitchLineVel_unit.setSizePolicy(sizePolicy2)
+        self.lb_pitchLineVel_unit.setFont(font)
+        self.lb_pitchLineVel_unit.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.gridLayout_3.addWidget(self.label_81, 13, 1, 1, 1)
+        self.gridLayout_3.addWidget(self.lb_pitchLineVel_unit, 13, 1, 1, 1)
 
         self.lb_pitchLineVel = QLabel(self.tab_stress)
         self.lb_pitchLineVel.setObjectName(u"lb_pitchLineVel")
@@ -1825,8 +1848,8 @@ class Ui_jpgearqt(object):
         QWidget.setTabOrder(self.cb_singleViewMesh, self.cb_circlesMesh)
         QWidget.setTabOrder(self.cb_circlesMesh, self.cb_LoC)
         QWidget.setTabOrder(self.cb_LoC, self.pb_animate)
-        QWidget.setTabOrder(self.pb_animate, self.le_speed)
-        QWidget.setTabOrder(self.le_speed, self.le_torque)
+        QWidget.setTabOrder(self.pb_animate, self.le_RPM)
+        QWidget.setTabOrder(self.le_RPM, self.le_torque)
         QWidget.setTabOrder(self.le_torque, self.le_FW1)
         QWidget.setTabOrder(self.le_FW1, self.le_FW2)
         QWidget.setTabOrder(self.le_FW2, self.le_E1)
@@ -1852,56 +1875,59 @@ class Ui_jpgearqt(object):
         jpgearqt.setWindowTitle(QCoreApplication.translate("jpgearqt", u"jpGear", None))
         self.actiontest.setText(QCoreApplication.translate("jpgearqt", u"test", None))
         self.lb_TargetModule.setText(QCoreApplication.translate("jpgearqt", u"Target Module", None))
-        self.lb_TargetGearRatio.setText(QCoreApplication.translate("jpgearqt", u"Target Gear Ratio", None))
+        self.pb_calcGearSizes.setText(QCoreApplication.translate("jpgearqt", u"Find Gear Sizes", None))
         self.cb_CD_width.setItemText(0, QCoreApplication.translate("jpgearqt", u"Target Center Distance", None))
         self.cb_CD_width.setItemText(1, QCoreApplication.translate("jpgearqt", u"Target Overall Width", None))
 
-        self.pb_calcGearSizes.setText(QCoreApplication.translate("jpgearqt", u"Find Gear Sizes", None))
-        self.lb_CenterDistance.setText(QCoreApplication.translate("jpgearqt", u"Center Distance", None))
+        self.lb_TargetGearRatio.setText(QCoreApplication.translate("jpgearqt", u"Target Gear Ratio", None))
+        self.lb_targetMod_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_TargetModule_3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_targetCD_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_GR5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.rb_2.setText("")
-        self.rb_3.setText("")
+        self.lb_width2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_gN4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_gN1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_icon1.setText("")
+        self.lb_gN3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_gear.setText(QCoreApplication.translate("jpgearqt", u"Gear", None))
         self.lb_GR1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_width5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_gN2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_GearRatio.setText(QCoreApplication.translate("jpgearqt", u"Gear Ratio", None))
-        self.lb_width1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_CD5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.pb_useLayout.setText(QCoreApplication.translate("jpgearqt", u"Use this Layout", None))
         self.lb_icon3.setText("")
-        self.lb_GR4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.rb_1.setText("")
-        self.lb_CD2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_icon5.setText("")
-        self.lb_width3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_width4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.rb_1.setText("")
+        self.lb_icon4.setText("")
+        self.lb_pinion.setText(QCoreApplication.translate("jpgearqt", u"Pinion", None))
+        self.lb_width5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_width1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_icon2.setText("")
+        self.lb_CD3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_CD2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_teeth.setText(QCoreApplication.translate("jpgearqt", u"Teeth", None))
         self.lb_teeth_2.setText(QCoreApplication.translate("jpgearqt", u"Teeth", None))
-        self.rb_4.setText("")
-        self.lb_icon2.setText("")
         self.lb_gN5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_OverallWidth.setText(QCoreApplication.translate("jpgearqt", u"Overall Width", None))
-        self.rb_5.setText("")
-        self.lb_icon4.setText("")
-        self.lb_GR5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_CD1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_width2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_CD4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_gear.setText(QCoreApplication.translate("jpgearqt", u"Gear", None))
-        self.lb_CD3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_pinion.setText(QCoreApplication.translate("jpgearqt", u"Pinion", None))
-        self.lb_GR3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_gN3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_CenterDistance.setText(QCoreApplication.translate("jpgearqt", u"Center Distance", None))
         self.lb_GR2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_GR4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_width4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_GearRatio.setText(QCoreApplication.translate("jpgearqt", u"Gear Ratio", None))
+        self.lb_OverallWidth.setText(QCoreApplication.translate("jpgearqt", u"Overall Width", None))
+        self.lb_gN1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.rb_4.setText("")
+        self.rb_3.setText("")
+        self.lb_CD5.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_CD4.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_GR3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.pb_useLayout.setText(QCoreApplication.translate("jpgearqt", u"Use this Layout", None))
+        self.lb_width3.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_gN2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.rb_5.setText("")
+        self.lb_CD1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
+        self.lb_icon1.setText("")
         self.tabW_main.setTabText(self.tabW_main.indexOf(self.tab_layout), QCoreApplication.translate("jpgearqt", u"Layout Helper", None))
         self.lb_CD_value.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_bkl_units.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
-        self.label_45.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
-        self.label_57.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_bkl_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_rtcl_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rtip_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_16.setText(QCoreApplication.translate("jpgearqt", u"Root Clearance", None))
-        self.label_65.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rr_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_tts1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_undercut2.setText("")
         self.label_43.setText(QCoreApplication.translate("jpgearqt", u"Standard Pitch Radius", None))
@@ -1909,9 +1935,9 @@ class Ui_jpgearqt(object):
         self.lb_CR.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_bkl_text.setText(QCoreApplication.translate("jpgearqt", u"Backlash", None))
         self.lb_Roe1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_27.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Ro_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_30.setText(QCoreApplication.translate("jpgearqt", u"Outer Radius", None))
-        self.label_31.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Ros_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_tt2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Rtipmax2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_52.setText(QCoreApplication.translate("jpgearqt", u"Standard Tooth Thickness", None))
@@ -1920,30 +1946,30 @@ class Ui_jpgearqt(object):
         self.lb_undercut1.setText("")
         self.label_49.setText(QCoreApplication.translate("jpgearqt", u"Effective Outer Radius", None))
         self.label_50.setText(QCoreApplication.translate("jpgearqt", u"Pitch Radius", None))
-        self.label_53.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rtipmax_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_58.setText(QCoreApplication.translate("jpgearqt", u"Gear Ratio", None))
-        self.label_24.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rf_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.cb_CD_bkl.setItemText(0, QCoreApplication.translate("jpgearqt", u"Backlash", None))
         self.cb_CD_bkl.setItemText(1, QCoreApplication.translate("jpgearqt", u"Center Distance", None))
 
         self.cb_CD_bkl.setCurrentText(QCoreApplication.translate("jpgearqt", u"Backlash", None))
         self.label_29.setText(QCoreApplication.translate("jpgearqt", u"deg", None))
-        self.label_15.setText(QCoreApplication.translate("jpgearqt", u"Root Fillet", None))
+        self.lb_Rf.setText(QCoreApplication.translate("jpgearqt", u"Root Fillet", None))
         self.label_46.setText(QCoreApplication.translate("jpgearqt", u"Root Radius", None))
         self.lb_Rp1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_39.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
-        self.label_51.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_mod_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rff_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_tt1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Romax2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_13.setText(QCoreApplication.translate("jpgearqt", u"Max Outer Radius", None))
         self.label_32.setText(QCoreApplication.translate("jpgearqt", u"Standard Outer Radius", None))
-        self.label_44.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rs_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_Rff2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Ros2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_42.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_tts_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_59.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Rs2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_48.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_tt_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_Rtipmax1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_GR.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_40.setText(QCoreApplication.translate("jpgearqt", u"Max Root Fillet", None))
@@ -1956,26 +1982,26 @@ class Ui_jpgearqt(object):
         self.label_6.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Roe2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Rs1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_35.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Romax_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_Rr2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Rff1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_34.setText(QCoreApplication.translate("jpgearqt", u"Tip Fillet", None))
         self.lb_Ros1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.lb_CD_units.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_CD_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_47.setText(QCoreApplication.translate("jpgearqt", u"Tooth Thickness", None))
-        self.label_41.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rp_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_22.setText(QCoreApplication.translate("jpgearqt", u"Teeth", None))
         self.label_17.setText(QCoreApplication.translate("jpgearqt", u"Gear 1", None))
         self.label_19.setText(QCoreApplication.translate("jpgearqt", u"Gear 2", None))
         self.lb_Rp2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_60.setText(QCoreApplication.translate("jpgearqt", u"-", None))
-        self.label_25.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_CD_bkl_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_55.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_tts2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_21.setText(QCoreApplication.translate("jpgearqt", u"Common", None))
-        self.label_28.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Roe_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.label_66.setText(QCoreApplication.translate("jpgearqt", u"Standard Root Radius", None))
-        self.label_67.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_Rrs_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_Rrs1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_Rrs2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.pb_drawGear.setText(QCoreApplication.translate("jpgearqt", u"Draw Gears", None))
@@ -1996,20 +2022,20 @@ class Ui_jpgearqt(object):
         self.label_83.setText(QCoreApplication.translate("jpgearqt", u"Face Width", None))
         self.le_E1.setText("")
         self.le_torque.setText("")
-        self.label_77.setText(QCoreApplication.translate("jpgearqt", u"Mpa", None))
+        self.lb_stressB_unit.setText(QCoreApplication.translate("jpgearqt", u"Mpa", None))
         self.label_84.setText(QCoreApplication.translate("jpgearqt", u"Pinion Torque", None))
         self.lb_stressC2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.le_E2.setText("")
         self.label_85.setText(QCoreApplication.translate("jpgearqt", u"Pinion Speed", None))
         self.le_FW1.setText("")
-        self.label_79.setText(QCoreApplication.translate("jpgearqt", u"Mpa", None))
+        self.lb_stressC_unit.setText(QCoreApplication.translate("jpgearqt", u"Mpa", None))
         self.le_FW2.setText("")
-        self.label_63.setText(QCoreApplication.translate("jpgearqt", u"MPa", None))
+        self.lb_E_unit.setText(QCoreApplication.translate("jpgearqt", u"MPa", None))
         self.label_82.setText(QCoreApplication.translate("jpgearqt", u"Gear 2", None))
-        self.le_speed.setText("")
+        self.le_RPM.setText("")
         self.label_37.setText(QCoreApplication.translate("jpgearqt", u"Gear 1", None))
         self.label_87.setText(QCoreApplication.translate("jpgearqt", u"Poisson's Ratio", None))
-        self.label_56.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
+        self.lb_FW_unit.setText(QCoreApplication.translate("jpgearqt", u"mm", None))
         self.lb_stressB1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_64.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.lb_stressC1.setText(QCoreApplication.translate("jpgearqt", u"-", None))
@@ -2017,11 +2043,11 @@ class Ui_jpgearqt(object):
         self.le_nu2.setText("")
         self.label_76.setText(QCoreApplication.translate("jpgearqt", u"Bending Stress", None))
         self.le_nu1.setText("")
-        self.label_61.setText(QCoreApplication.translate("jpgearqt", u"Nmm", None))
+        self.lb_torque_unit.setText(QCoreApplication.translate("jpgearqt", u"Nmm", None))
         self.lb_stressB2.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.label_62.setText(QCoreApplication.translate("jpgearqt", u"RPM", None))
         self.label_80.setText(QCoreApplication.translate("jpgearqt", u"Pitch Line Velocity", None))
-        self.label_81.setText(QCoreApplication.translate("jpgearqt", u"m/s", None))
+        self.lb_pitchLineVel_unit.setText(QCoreApplication.translate("jpgearqt", u"m/s", None))
         self.lb_pitchLineVel.setText(QCoreApplication.translate("jpgearqt", u"-", None))
         self.pb_stress.setText(QCoreApplication.translate("jpgearqt", u"Calculate Stress", None))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_stress1), QCoreApplication.translate("jpgearqt", u"Gear 1", None))

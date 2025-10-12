@@ -2,6 +2,9 @@ class Gear:
     def __init__(self, _ID):
         self.ID = _ID
 
+        self.reset()
+
+    def reset(self):
         self.N = -1                             # teeth
 
         self.x = 0				# profile shift
