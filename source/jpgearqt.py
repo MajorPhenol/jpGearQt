@@ -1714,6 +1714,8 @@ class jpgearqt(QWidget):
 
         curveCol = self.layoutGear(_gear)
         curveCol.set_transform(mtransforms.Affine2D().scale(1/self.units.lenMult) + canvas.axes.transData)
+        if _gear.ID == 2:
+            curveCol.set_edgecolor('r')
         canvas.axes.add_collection(curveCol)
 
         if cb_circles.isChecked():
@@ -1832,6 +1834,15 @@ class jpgearqt(QWidget):
         c = pi - b - self.OPA - deg2rad(90)
         x4 = (self.G1.Roe * cos(c))
         y4 = -(self.G1.Roe * sin(c))
+        # scale to the right units
+        x1 = x1 / self.units.lenMult
+        x2 = x2 / self.units.lenMult
+        x3 = x3 / self.units.lenMult
+        x4 = x4 / self.units.lenMult
+        y1 = y1 / self.units.lenMult
+        y2 = y2 / self.units.lenMult
+        y3 = y3 / self.units.lenMult
+        y4 = y4 / self.units.lenMult
 
         # config slider
         slider = self.ui.hSlider_Mesh
@@ -1890,7 +1901,7 @@ class jpgearqt(QWidget):
             loc, = canvas.axes.plot([x3,x4],[y3,y4], color='k', marker='x', linewidth=2, label='Line of Contact')
             # contact point
             traceAngle = self.OPA - phi_A
-            R = self.G1.Rb/cos(phi_A)
+            R = (self.G1.Rb/cos(phi_A)) / self.units.lenMult
             traceX = R*cos(traceAngle)
             traceY = R*sin(traceAngle)
             tracePoint, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
