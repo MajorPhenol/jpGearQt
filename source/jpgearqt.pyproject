@@ -4,6 +4,11 @@
         "form.ui",
         "popup.ui",
         "Gear.py",
-        "Units.py"
+        "Units.py",
+        "draw.py",
+        "helper.py",
+        "MplCanvas.py",
+        "PopupWindow.py",
+        "stress.py"
     ]
 }

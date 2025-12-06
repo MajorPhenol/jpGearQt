@@ -1,6 +1,7 @@
 class Gear:
     def __init__(self, _ID):
         self.ID = _ID
+        self.type = "external"
 
         self.reset()
 
@@ -16,6 +17,7 @@ class Gear:
         self.Rp = -1             		# pitch radius at OPA
         self.Rb = -1                            # base circle radius
         self.Pb = -1                     	# base pitch
+        self.Ps = -1                     	# circle pitch
 
         self.Ros = -1                    	# standard outer radius
         self.Ro = -1     			# actual outer radius
@@ -23,6 +25,7 @@ class Gear:
         self.Rtip = 0				# tip radius
         self.Rtip_max = 0 			# max possible tip radius
         self.Roe = 0    			# effective outer radius, considering tip radius
+        self.Rrim = -1                          # rim radius for internal gear
 
         self.Rr = -1                            # root radius
         self.Rrs = -1                           # standard root radius

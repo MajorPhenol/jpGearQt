@@ -12,7 +12,6 @@
 
 import sys
 import os, tempfile
-from enum import Enum
 
 from PySide6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
 from PySide6.QtWidgets import QMenuBar, QMenu
@@ -22,34 +21,31 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon, QPixmap, QShortcut, QKeySequence, QCloseEvent, QAction, QActionGroup
 
 from ui_form import Ui_jpgearqt
-from ui_popup import Ui_Popup
 
-###############################################################################
 from Gear import Gear
+from MplCanvas import MplCanvas
 import Units
+from helper import is_number, invF, revInvF
+import draw
+import stress
+
+from math import floor
 
 import numpy as np
 from numpy import pi, sin, cos, tan, arcsin, arccos, arctan
 from numpy import rad2deg, deg2rad
-from numpy import sqrt, zeros, linspace, polyval, real
+from numpy import sqrt, zeros, linspace, real
+# why isn't this in numpy???
+tau = 2*pi
 
 from scipy.optimize import fsolve, least_squares
 
-from matplotlib.figure import Figure
 import matplotlib.pyplot as pyplot
-import matplotlib.path as mpath
-import matplotlib.patches as mpatch
 import matplotlib.collections as mcollections
 import matplotlib.transforms as mtransforms
-import matplotlib.animation as manimation
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 
-import copy
 import json
-
-import ezdxf
-from ezdxf.math import UCS
-from ezdxf import zoom
 
 ###############################################################################
 # Use this code to signal the splash screen removal.
@@ -63,101 +59,6 @@ if "NUITKA_ONEFILE_PARENT" in os.environ:
       os.unlink(splash_filename)
 
 ###############################################################################
-# why isn't this in numpy???
-tau = 2*pi
-
-def is_number(n):
-    try:
-        float(n)
-    except ValueError:
-        return False
-    return True
-
-# Involute Function
-def invF(angle):
-    """Computes the involute function of a given profile angle.
-
-    All angles in radians.
-    """
-
-    return tan(angle) - angle
-
-# Reverse Involute Function
-def revInvF(angle):
-    """Computes the reverse involute function, returning the profile angle.
-
-    From "The Geometry of Involute Gears" by J.R. Colbourne
-    Eqs. 2.16 - 2.17
-
-    All angles in radians.
-    """
-
-    q = angle**(2/3)
-
-    poly = [-0.00048, 0.00319, -0.00894, -0.00321, 0.32451, 1.04004, 1]
-    x = polyval(poly, q)
-
-    return arccos(1/x)
-
-
-###############################################################################
-class MplCanvas(FigureCanvasQTAgg):
-    def __init__(self, parent=None, _width=5, _height=4, _dpi=100):
-        self.fig = Figure(figsize=(_width, _height), dpi=_dpi)
-        self.axes = self.fig.add_subplot()
-        super().__init__(self.fig)
-
-class popupWindow(QWidget):
-    def __init__(self, _jpgearqt):
-        super().__init__()
-        self.jpgearqt = _jpgearqt
-        self.ui = Ui_Popup()
-        self.ui.setupUi(self)
-        self.connectUI()
-        self.canvas = MplCanvas()
-
-    def connectUI(self):
-        self.ui.cb_circlesAnim.checkStateChanged.connect(lambda: self.updateCircles())
-        self.ui.cb_singleViewAnim.checkStateChanged.connect(lambda: self.updateAnimAxes())
-
-    def updateCircles(self):
-        if self.ui.cb_circlesAnim.isChecked():
-            circleCol1 = self.jpgearqt.addCircles(self.jpgearqt.G1, self.canvas, _legend=False)
-            circleCol2 = self.jpgearqt.addCircles(self.jpgearqt.G2, self.canvas, _legend=False)
-            circleCol2.set_transform(mtransforms.Affine2D().translate(self.jpgearqt.CD/self.jpgearqt.units.lenMult, 0) + self.canvas.axes.transData)
-            # add labels so we can delete them later
-            circleCol1.set_label('circleCol1')
-            circleCol2.set_label('circleCol2')
-
-            self.canvas.axes.add_collection(circleCol1)
-            self.canvas.axes.add_collection(circleCol2)
-
-        else:
-            collectionList = self.canvas.axes.collections
-            for collection in collectionList:
-                if collection.get_label() == 'circleCol1' or collection.get_label() == 'circleCol2':
-                    collection.remove()
-
-    def updateAnimAxes(self):
-        canvas = self.canvas
-
-        # tight view
-        if self.ui.cb_singleViewAnim.isChecked():
-            topLimit = (self.jpgearqt.G1.Rp*sin(tau/self.jpgearqt.G1.N)) / self.jpgearqt.units.lenMult
-            bottomLimit = -topLimit
-            leftLimit = (self.jpgearqt.G1.Rp / self.jpgearqt.units.lenMult) - topLimit
-            rightLimit = (self.jpgearqt.G1.Rp / self.jpgearqt.units.lenMult) + topLimit
-        # full view
-        else:
-            sizeBuffer = 1.1
-            leftLimit = (-self.jpgearqt.G1.Ro * sizeBuffer) / self.jpgearqt.units.lenMult
-            rightLimit = (self.jpgearqt.CD + self.jpgearqt.G2.Ro * sizeBuffer) / self.jpgearqt.units.lenMult
-            topLimit = (max(self.jpgearqt.G1.Ro, self.jpgearqt.G2.Ro) * sizeBuffer) / self.jpgearqt.units.lenMult
-            bottomLimit = -topLimit
-
-        canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-        canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
 class jpgearqt(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -287,22 +188,31 @@ class jpgearqt(QWidget):
         self.SC_cycleTabRV.activated.connect(lambda: self.cycleTab(dir='backward'))
         # draw gears
         self.SC_drawGear = QShortcut(QKeySequence("Ctrl+D"), self)
-        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
-        self.SC_drawGear.activated.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
-        self.SC_drawGear.activated.connect(lambda: self.drawMesh(_updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: draw.drawGear(self, self.G1, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: draw.drawGear(self, self.G2, _updateAxes=True))
+        self.SC_drawGear.activated.connect(lambda: draw.drawMesh(self, _updateAxes=True))
 
     def connectUI(self):
         # First tab
+        #################
+        self.ui.rb_ext_layout.clicked.connect(lambda: self.setType("external"))
+        self.ui.rb_int_layout.clicked.connect(lambda: self.setType("internal"))
+
         self.ui.pb_calcGearSizes.clicked.connect(lambda: self.findGearSizes())
         self.ui.le_pN.editingFinished.connect(lambda: self.updatePinionN())
 
-        rb_list = self.ui.buttonGroup.buttons()
+        # list of layout options
+        rb_list = self.ui.bg_layout.buttons()
         for button in rb_list:
-            button.toggled.connect(lambda: self.drawLayout())
+            button.toggled.connect(lambda: draw.drawHelper())
         # use layout button
         self.ui.pb_useLayout.clicked.connect(lambda: self.useLayout())
 
         # Second tab
+        #################
+        self.ui.rb_ext_design.clicked.connect(lambda: self.setType("external"))
+        self.ui.rb_int_design.clicked.connect(lambda: self.setType("internal"))
+
         self.ui.le_mod.editingFinished.connect(lambda: self.set_mod(self.ui.le_mod.text()))
 
         self.ui.le_PA_deg.editingFinished.connect(lambda: self.set_PA_deg(self.ui.le_PA_deg.text()))
@@ -319,6 +229,9 @@ class jpgearqt(QWidget):
         self.ui.le_Ro1.editingFinished.connect(lambda: self.set_Ro(self.G1, self.ui.le_Ro1.text()))
         self.ui.le_Ro2.editingFinished.connect(lambda: self.set_Ro(self.G2, self.ui.le_Ro2.text()))
 
+        self.ui.le_Rr2.editingFinished.connect(lambda: self.set_Rr(self.ui.le_Rr2.text()))
+        self.ui.le_Rrim.editingFinished.connect(lambda: self.set_Rrim(self.G2, self.ui.le_Rrim.text()))
+
         self.ui.le_Rtip1.editingFinished.connect(lambda: self.set_Rtip(self.G1, self.ui.le_Rtip1.text()))
         self.ui.le_Rtip2.editingFinished.connect(lambda: self.set_Rtip(self.G2, self.ui.le_Rtip2.text()))
 
@@ -332,25 +245,26 @@ class jpgearqt(QWidget):
         self.ui.le_FW2.editingFinished.connect(lambda: self.set_FW(self.G2, self.ui.le_FW2.text()))
 
         # draw gear button
-        self.ui.pb_drawGear.clicked.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
-        self.ui.pb_drawGear.clicked.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
-        self.ui.pb_drawGear.clicked.connect(lambda: self.drawMesh(_updateAxes=True))
+        self.ui.pb_drawGear.clicked.connect(lambda: draw.drawGear(self, self.G1, _updateAxes=True))
+        self.ui.pb_drawGear.clicked.connect(lambda: draw.drawGear(self, self.G2, _updateAxes=True))
+        self.ui.pb_drawGear.clicked.connect(lambda: draw.drawMesh(self, _updateAxes=True))
         # single tooth view checkboxes
-        self.ui.cb_singleViewG1.checkStateChanged.connect(lambda: self.drawGear(self.G1, _updateAxes=True))
-        self.ui.cb_singleViewG2.checkStateChanged.connect(lambda: self.drawGear(self.G2, _updateAxes=True))
-        self.ui.cb_singleViewMesh.checkStateChanged.connect(lambda: self.drawMesh(_updateAxes=True))
+        self.ui.cb_singleViewG1.checkStateChanged.connect(lambda: draw.drawGear(self, self.G1, _updateAxes=True))
+        self.ui.cb_singleViewG2.checkStateChanged.connect(lambda: draw.drawGear(self, self.G2, _updateAxes=True))
+        self.ui.cb_singleViewMesh.checkStateChanged.connect(lambda: draw.drawMesh(self, _updateAxes=True))
         # circles checkboxes
-        self.ui.cb_circlesG1.checkStateChanged.connect(lambda: self.drawGear(self.G1, _updateAxes=False))
-        self.ui.cb_circlesG2.checkStateChanged.connect(lambda: self.drawGear(self.G2, _updateAxes=False))
-        self.ui.cb_circlesMesh.checkStateChanged.connect(lambda: self.drawMesh(_updateAxes=False))
+        self.ui.cb_circlesG1.checkStateChanged.connect(lambda: draw.drawGear(self, self.G1, _updateAxes=False))
+        self.ui.cb_circlesG2.checkStateChanged.connect(lambda: draw.drawGear(self, self.G2, _updateAxes=False))
+        self.ui.cb_circlesMesh.checkStateChanged.connect(lambda: draw.drawMesh(self, _updateAxes=False))
         # LoC checkbox
-        self.ui.cb_LoC.checkStateChanged.connect(lambda: self.drawMesh(_updateAxes=False))
+        self.ui.cb_LoC.checkStateChanged.connect(lambda: draw.drawMesh(self, _updateAxes=False))
         # mesh slider
-        self.ui.hSlider_Mesh.valueChanged.connect(lambda: self.drawMesh(_updateAxes=False))
+        self.ui.hSlider_Mesh.valueChanged.connect(lambda: draw.drawMesh(self, _updateAxes=False))
         # animate button
-        self.ui.pb_animate.clicked.connect(lambda: self.createAnimWindow())
+        self.ui.pb_animate.clicked.connect(lambda: draw.createAnimWindow(self))
 
         # Stress tab
+        #################
         self.ui.le_RPM.editingFinished.connect(lambda: self.set_RPM(self.ui.le_RPM.text()))
         self.ui.le_torque.editingFinished.connect(lambda: self.set_torque(self.ui.le_torque.text()))
         self.ui.le_E1.editingFinished.connect(lambda: self.set_E(self.G1, self.ui.le_E1.text()))
@@ -417,8 +331,8 @@ class jpgearqt(QWidget):
         self.OPA_deg = -1               # operating pressure angle, degrees
         self.OPA = -1                   # operating pressure angle, radians
         self.bkl = 0                    # backlash
-        self.rtcl1 = 0                  # root clearances
-        self.rtcl2 = 0
+        self.rtcl1 = -1                 # root clearances
+        self.rtcl2 = -1
         self.CD = -1                    # center distance
         self.CR = 0                     # contact ratio
         self.RPM = 1                  # pinion speed
@@ -453,11 +367,15 @@ class jpgearqt(QWidget):
         self.setText(self.ui.le_Rtip1, self.G1.Rtip, self.units.lenMult)
         self.setText(self.ui.le_Rtip2, self.G2.Rtip, self.units.lenMult)
 
-        self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
-        self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
+        if self.rtcl1 > 0:
+            self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
+        if self.rtcl2 > 0:
+            self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
 
         self.setText(self.ui.le_Rf1, self.G1.Rf, self.units.lenMult)
         self.setText(self.ui.le_Rf2, self.G2.Rf, self.units.lenMult)
+
+        self.setType(self.G2.type)
 
         # mesh slider
         self.sliderScale = 100    # the slider can only handle ints, show scale up everthing
@@ -483,8 +401,7 @@ class jpgearqt(QWidget):
             if gear.Rb < 0 :
                 messageBox = QMessageBox.critical(self, "Error exporting", "Could not export geometry for gear "+str(gear.ID))
             else:
-                self.layoutGear(gear, save=True)
-
+                draw.layoutGear(self, gear, save=True)
 
     def openJSON(self):
         loadPath, selectedFilter = QFileDialog.getOpenFileName(self, 'Load Design')
@@ -492,6 +409,8 @@ class jpgearqt(QWidget):
         if loadPath == '':
             return
         else:
+            self.savePath = loadPath
+
             with open(loadPath, 'r', encoding='utf-8') as f:
                 dictFull = json.load(f)
 
@@ -509,11 +428,10 @@ class jpgearqt(QWidget):
             actionsList = self.groupUnits.actions()
             actionsList[int(dictM["units"])].setChecked(True)
 
+            self.setType(dictM["type"])
+
             self.set_mod(dictM["mod"])
             self.set_PA_deg(dictM["PA_deg"])
-
-            self.set_bkl(dictM["bkl"])
-            self.set_CD(dictM["CD"])
 
             if dictM["set_CD_bkl"] == 0:
                 # use backlash
@@ -522,12 +440,19 @@ class jpgearqt(QWidget):
                 # use center distance
                 self.ui.cb_CD_bkl.setCurrentIndex(1)
 
+            self.set_bkl(dictM["bkl"])
+            self.set_CD(dictM["CD"])
+
             # set gear parameters
             for gear, dict in zip([self.G1, self.G2], [dictG1, dictG2]):
                 self.set_N(gear, dict["N"])
                 self.set_x(gear, dict["x"])
                 self.set_Ro(gear, dict["Ro"])
                 self.set_Rtip(gear, dict["Rtip"])
+
+            if dictM["type"] == "internal":
+                self.set_Rrim(self.G2, dictG2["Rrim"])
+                self.set_Rr(dictG2["Rr"])
 
             self.set_rtcl(self.G1, dictM["rtcl1"])
             self.set_rtcl(self.G2, dictM["rtcl2"])
@@ -577,7 +502,9 @@ class jpgearqt(QWidget):
             "x" : _gear.x,
             "Ro" : _gear.Ro / self.units.lenMult,
             "Rtip" : _gear.Rtip / self.units.lenMult,
+            "Rr" : _gear.Rr / self.units.lenMult,
             "Rf" : _gear.Rf / self.units.lenMult,
+            "Rrim" : _gear.Rrim / self.units.lenMult,
             "FW" : _gear.FW / self.units.lenMult,
             "E" : _gear.E / self.units.pressureMult,
             "nu" : _gear.nu,
@@ -589,6 +516,7 @@ class jpgearqt(QWidget):
             mod = 25.4 / self.mod
 
         return {
+            "type" : self.G2.type,
             "units": self.unitsList.index(self.units),
             "mod" : mod,
             "PA_deg" : self.PA_deg,
@@ -622,6 +550,34 @@ class jpgearqt(QWidget):
     def setText(self, label, variable, mult=1, _format="{:.3f}"):
         label.setText(str(_format.format(variable/mult)))
 
+    def setType(self, _type)  :
+        if _type == "external":
+            self.G2.type = "external"
+            self.ui.rb_ext_layout.setChecked(True)
+            self.ui.rb_ext_design.setChecked(True)
+            self.ui.lb_Rrim_text.setHidden(True)
+            self.ui.lb_Rrim_unit.setHidden(True)
+            self.ui.le_Rrim.setHidden(True)
+            self.ui.le_Ro2.setEnabled(True)
+            self.ui.le_Rr2.setEnabled(False)
+
+        elif _type == "internal":
+            self.G2.type = "internal"
+            self.ui.rb_int_layout.setChecked(True)
+            self.ui.rb_int_design.setChecked(True)
+            self.ui.lb_Rrim_text.setHidden(False)
+            self.ui.lb_Rrim_unit.setHidden(False)
+            self.ui.le_Rrim.setHidden(False)
+            self.setText(self.ui.le_Rrim, self.G2.Rrim, self.units.lenMult)
+            self.ui.le_Ro2.setEnabled(False)
+            self.ui.le_Rr2.setEnabled(True)
+
+        if self.ui.tabW_main.currentIndex() == 0: # layout helper tab
+            draw.drawHelper(self)
+
+        if self.ui.tabW_main.currentIndex() == 1: # design tab
+            self.updateBaseAndPitch(self.G2)
+
 # Helper Tab ##################################################################
     def findGearSizes(self):
         try:
@@ -634,50 +590,90 @@ class jpgearqt(QWidget):
         except:
             return
 
-        if self.ui.cb_CD_width.currentIndex() == 0:
-            """
-            (N1*mod)/2 + (N2*mod)/2 = CD  →  (mod/2)*N1 + (mod/2)*N2 = CD
-            N2 / N1 = GR  →  GR*N1 - N2 = 0
+        if self.G2.type == "external":
+            if self.ui.cb_CD_width.currentIndex() == 0:
+                """
+                (N1*mod)/2 + (N2*mod)/2 = CD  →  (mod/2)*N1 + (mod/2)*N2 = CD
+                N2 / N1 = GR  →  GR*N1 - N2 = 0
 
-            | mod/2 mod/2 | | N1 | = | CD |
-            | GR    -1    | | N2 |   | 0  |
-            """
-            matA = np.array([ [mod/2, mod/2], [GR, -1] ])
-            matB = np.array([ [size], [0] ])
-            matX = np.matmul(np.linalg.inv(matA), matB)
+                | mod/2 mod/2 | | N1 | = | CD |
+                | GR    -1    | | N2 |   | 0  |
+                """
+                matA = np.array([ [mod/2, mod/2], [GR, -1] ])
+                matB = np.array([ [size], [0] ])
+                matX = np.matmul(np.linalg.inv(matA), matB)
 
-            N1 = round(float(matX[0, 0]))
-            N2 = round(N1*GR)
-            # N2 = round(float(matX[1, 0]))
+                N1 = round(float(matX[0, 0]))
+                N2 = round(N1*GR)
+                # N2 = round(float(matX[1, 0]))
 
-            # self.ui.le_pN.setText(str("{:.0f}".format(N1)))
-            # self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
-            self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
-            self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
+                # self.ui.le_pN.setText(str("{:.0f}".format(N1)))
+                # self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
+                self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+                self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
 
-            self.populateChart(N2)
-        else:
-            """
-            mod*N1/2 + mod*N2/2 + mod*(N1+2)/2 + mod*(N2+2)/2 = width  →  mod*N1 + mod*N2 = width - 2*mod
-            N2 / N1 = GR  →  GR*N1 - N2 = 0
+                self.populateChart(N2)
+            else:
+                """
+                mod*N1/2 + mod*N2/2 + mod*(N1+2)/2 + mod*(N2+2)/2 = width  →  mod*N1 + mod*N2 = width - 2*mod
+                N2 / N1 = GR  →  GR*N1 - N2 = 0
 
-            | mod mod | | N1 | = | width - 2*mod |
-            | GR  -1  | | N2 |   | 0             |
-            """
-            matA = np.array([ [mod, mod], [GR, -1] ])
-            matB = np.array([ [size - 2*mod], [0] ])
-            matX = np.matmul(np.linalg.inv(matA), matB)
+                | mod mod | | N1 | = | width - 2*mod |
+                | GR  -1  | | N2 |   | 0             |
+                """
+                matA = np.array([ [mod, mod], [GR, -1] ])
+                matB = np.array([ [size - 2*mod], [0] ])
+                matX = np.matmul(np.linalg.inv(matA), matB)
 
-            N1 = round(float(matX[0, 0]))
-            N2 = round(N1*GR)
-            # N2 = round(float(matX[1, 0]))
+                N1 = round(float(matX[0, 0]))
+                N2 = round(N1*GR)
 
-            # self.ui.le_pN.setText(str("{:.0f}".format(N1)))
-            # self.ui.lb_gN3.setText(str("{:.0f}".format(N2)))
-            self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
-            self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
+                self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+                self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
 
-            self.populateChart(N2)
+                self.populateChart(N2)
+
+        elif self.G2.type == "internal":
+            if self.ui.cb_CD_width.currentIndex() == 0:
+                """
+                (N2*mod)/2 - (N1*mod)/2 = CD  →  -(mod/2)*N1 + (mod/2)*N2 = CD
+                N2 / N1 = GR  →  GR*N1 - N2 = 0
+
+                | -mod/2 mod/2 | | N1 | = | CD |
+                | GR     -1    | | N2 |   | 0  |
+                """
+                matA = np.array([ [-mod/2, mod/2], [GR, -1] ])
+                matB = np.array([ [size], [0] ])
+                matX = np.matmul(np.linalg.inv(matA), matB)
+
+                N1 = round(float(matX[0, 0]))
+                N2 = round(N1*GR)
+
+                self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+                self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
+
+                self.populateChart(N2)
+            else:
+                """
+                mod*(N2+2) = width  →  mod*N2 = width - 2*mod
+                N2 / N1 = GR  →  GR*N1 - N2 = 0
+
+                | 0   mod | | N1 | = | width - 2*mod |
+                | GR  -1  | | N2 |   | 0             |
+                """
+                matA = np.array([ [0, mod], [GR, -1] ])
+                matB = np.array([ [size - 2*mod], [0] ])
+                matX = np.matmul(np.linalg.inv(matA), matB)
+
+                N1 = round(float(matX[0, 0]))
+                N2 = round(N1*GR)
+
+                self.setText(self.ui.le_pN, N1, 1, "{:.0f}")
+                self.setText(self.ui.lb_gN3, N2, 1, "{:.0f}")
+
+                self.populateChart(N2)
+
+        draw.drawHelper()
 
     def updatePinionN(self):
         try:
@@ -689,6 +685,7 @@ class jpgearqt(QWidget):
         N2 = round(N1 * GR)
 
         self.populateChart(N2)
+        draw.drawHelper()
 
     def populateChart(self, _N2):
         try:
@@ -747,7 +744,10 @@ class jpgearqt(QWidget):
                         ]
 
         for N2, label in zip(N2_list, CD_label_list):
-            CD = mod * (N1 + N2)/2
+            if self.G2.type == "external":
+                CD = mod * (N1 + N2)/2
+            elif self.G2.type == "internal":
+                CD = mod * (N2 - N1)/2
             self.setText(label, CD, self.units.lenMult, "{:.3f}")
 
         width_label_list = [
@@ -759,13 +759,18 @@ class jpgearqt(QWidget):
                         ]
 
         for N2, label in zip(N2_list, width_label_list):
-            CD = mod * (N1 + N2)/2
             Ros1 = mod * (N1 + 2)/2
-            Ros2 = mod * (N2 + 2)/2
-            width = Ros1 + CD + Ros2
+            if self.G2.type == "external":
+                Ros2 = mod * (N2 + 2)/2
+                CD = mod * (N1 + N2)/2
+                width = Ros1 + CD + Ros2
+            elif self.G2.type == "internal":
+                Ros2 = mod * (N2 + 2 + 3)/2 # add an addition 3*mod for the rim thickness
+                CD = mod * (N2 - N1)/2
+                width = 2 * Ros2
             self.setText(label, width, self.units.lenMult, "{:.3f}")
 
-        self.drawLayout()
+
 
     def useLayout(self):
         if self.ui.le_pN.text() == "":
@@ -804,69 +809,6 @@ class jpgearqt(QWidget):
 
         self.ui.tabW_main.setCurrentIndex(1)
 
-    def drawLayout(self):
-        try:
-            if self.units.modMult == "M":
-                mod = float(self.ui.le_targetMod.text())
-            elif self.units.modMult == "T":
-                mod = 25.4 / float(self.ui.le_targetMod.text())
-            N1 = int(self.ui.le_pN.text())
-        except:
-            return
-
-        radio_button_list = [
-                           self.ui.rb_1,
-                           self.ui.rb_2,
-                           self.ui.rb_3,
-                           self.ui.rb_4,
-                           self.ui.rb_5
-                           ]
-        N2_label_list = [
-                        self.ui.lb_gN1,
-                        self.ui.lb_gN2,
-                        self.ui.lb_gN3,
-                        self.ui.lb_gN4,
-                        self.ui.lb_gN5
-                        ]
-        N2 = -1
-        for N, radioButton in zip(N2_label_list, radio_button_list):
-            if radioButton.isChecked():
-                N2 = int(N.text())
-                break
-
-        Rs1 = (N1 * mod) / 2
-        Rs2 = (N2 * mod) / 2
-
-        Ro1 = ((N1 + 2) * mod) / 2
-        Ro2 = ((N2 + 2) * mod) / 2
-
-        CD = Rs1 + Rs2
-
-        circleList = []
-        # pitch circle
-        circleList.append(pyplot.Circle((0, 0), Rs1, color='y', ls='--', fill=False))
-        circleList.append(pyplot.Circle((CD, 0), Rs2, color='y', ls='--', fill=False))
-        # outer circle
-        circleList.append(pyplot.Circle((0, 0), Ro1, color='g', ls='--', fill=False))
-        circleList.append(pyplot.Circle((CD, 0), Ro2, color='g', ls='--', fill=False))
-
-        circleCol = mcollections.PatchCollection(circleList, match_original=True)
-
-        self.canvasHelper.axes.cla()
-
-        sizeBuffer = 1.1
-        leftLimit = (Ro1 * sizeBuffer) / self.units.lenMult
-        rightLimit = (CD + (Ro2 * sizeBuffer)) / self.units.lenMult
-        yLimit = (Ro2 * sizeBuffer) / self.units.lenMult
-        self.canvasHelper.axes.set_xlim(left=-leftLimit, right=rightLimit)
-        self.canvasHelper.axes.set_ylim(bottom=-yLimit, top=yLimit)
-        self.canvasHelper.axes.set_aspect('equal')
-
-        circleCol.set_transform(mtransforms.Affine2D().scale(1/self.units.lenMult) + self.canvasHelper.axes.transData)
-        self.canvasHelper.axes.add_collection(circleCol)
-
-        self.canvasHelper.draw()
-
 # Gear Design Tab #############################################################
     def swapBklandCD(self):
         # input backlash
@@ -880,7 +822,8 @@ class jpgearqt(QWidget):
             self.ui.lb_CD_text.show()
             self.ui.lb_CD_unit.show()
             self.ui.lb_CD_value.show()
-            self.setText(self.ui.lb_CD_value, self.CD, self.units.lenMult)
+            if self.CD > 0:
+                self.setText(self.ui.lb_CD_value, self.CD, self.units.lenMult)
 
         # input center distance
         elif self.ui.cb_CD_bkl.currentIndex() == 1:
@@ -900,12 +843,7 @@ class jpgearqt(QWidget):
             _gear.N = int(_N)
             if self.G1.N > 1 and self.G2.N > 1:
                 self.setText(self.ui.lb_GR, self.G2.N / self.G1.N)
-            self.set_x(_gear, _gear.x)
-
-    def set_x(self, _gear, _x):
-        if is_number(_x):
-            _gear.x = float(_x)
-            self.updateStandardToothThickness(_gear)
+            self.updateBaseAndPitch(_gear)
 
     def set_mod(self, _mod):
         if is_number(_mod):
@@ -913,15 +851,50 @@ class jpgearqt(QWidget):
                 self.mod = float(_mod)
             elif self.units.modMult == "T":
                 self.mod = 25.4 / float(_mod)
-            self.updateStandardToothThickness(self.G1)
-            self.updateStandardToothThickness(self.G2)
+            self.updateBaseAndPitch(self.G1)
+            self.updateBaseAndPitch(self.G2)
 
     def set_PA_deg(self, _PA_deg):
         if is_number(_PA_deg):
             self.PA_deg = float(_PA_deg)
             self.PA = deg2rad(self.PA_deg)
-            self.updateStandardToothThickness(self.G1)
-            self.updateStandardToothThickness(self.G2)
+            self.updateBaseAndPitch(self.G1)
+            self.updateBaseAndPitch(self.G2)
+
+    def updateBaseAndPitch(self, _gear):
+        if _gear.N > 0 and self.mod > 0 and self.PA > 0:
+            _gear.Rs = (self.mod * _gear.N) / 2
+            _gear.Rb = _gear.Rs * cos(self.PA)
+            _gear.Pb = tau * _gear.Rb / _gear.N
+            _gear.Ps = tau * _gear.Rs / _gear.N
+
+            if _gear.type == "external":
+                _gear.Ros = (self.mod * (_gear.N+2)) / 2
+            elif _gear.type == "internal":
+                _gear.Ros = (self.mod * (_gear.N+2.5)) / 2
+                _gear.Rrim = (self.mod * (_gear.N+5)) / 2
+            _gear.Ro = _gear.Ros
+
+            # update UI
+            if _gear.ID == 1:
+                self.setText(self.ui.lb_Rs1, self.G1.Rs, self.units.lenMult)
+                self.setText(self.ui.lb_Ros1, self.G1.Ros, self.units.lenMult)
+                self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+            else:
+                self.setText(self.ui.lb_Rs2, self.G2.Rs, self.units.lenMult)
+                self.setText(self.ui.lb_Ros2, self.G2.Ros, self.units.lenMult)
+                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
+                if _gear.type == "external":
+                    pass
+                elif _gear.type == "internal":
+                    self.setText(self.ui.le_Rrim, self.G2.Rrim, self.units.lenMult)
+
+            self.updateStandardToothThickness(_gear)
+
+    def set_x(self, _gear, _x):
+        if is_number(_x):
+            _gear.x = float(_x)
+            self.updateStandardToothThickness(_gear)
 
     def updateStandardToothThickness(self, _gear):
         if self.mod > 0 and self.PA > 0:
@@ -930,55 +903,50 @@ class jpgearqt(QWidget):
             if _gear.ID == 1:
                 self.setText(self.ui.lb_tts1, self.G1.tts, self.units.lenMult)
             else:
-                self.setText(self.ui.lb_tts2, self.G2.tts, self.units.lenMult)
+                if _gear.type == "external":
+                    self.setText(self.ui.lb_tts2, self.G2.tts, self.units.lenMult)
+                if _gear.type == "internal":
+                    self.setText(self.ui.lb_tts2, self.G2.Ps - self.G2.tts, self.units.lenMult)
 
-            self.updateBaseAndPitch(_gear)
-
-    def updateBaseAndPitch(self, _gear):
-        if _gear.N > 0 and self.mod > 0:
-            _gear.Rs = 0.5 * _gear.N * self.mod
-            _gear.Rb = _gear.Rs * cos(self.PA)
-            _gear.Pb = tau * _gear.Rb / _gear.N
-            _gear.Ros = (self.mod * (_gear.N+2) / 2)
-
+            self.calcStandardRtcl(_gear)
+            self.updateCenterDistance()
             self.updateRomax(_gear)
-            if _gear.Ro < _gear.Rp or _gear.Ro < 0:
-                self.set_Ro(_gear, _gear.Ros / self.units.lenMult)
-            else:
-                self.set_Ro(_gear, _gear.Ro / self.units.lenMult)
 
-            self.calcStandardRtcl()
+    def calcStandardRtcl(self, _gear):
+        # standard root clearance
+        addendum = self.mod
+        rtcl = (0.25 * addendum)
+        # standard root radius
+        Rrs_ext = _gear.Rs - addendum - rtcl
+        Rrs_int = _gear.Rs - addendum
 
-            if _gear.ID == 1:
-                self.setText(self.ui.lb_Rs1, self.G1.Rs, self.units.lenMult)
-                self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
-                self.setText(self.ui.lb_Ros1, self.G1.Ros, self.units.lenMult)
-            else:
-                self.setText(self.ui.lb_Rs2, self.G2.Rs, self.units.lenMult)
-                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
-                self.setText(self.ui.lb_Ros2, self.G2.Ros, self.units.lenMult)
+        if _gear.ID == 1:
+            _gear.Rrs = Rrs_ext
+            self.setText(self.ui.lb_Rrs1, self.G1.Rrs, self.units.lenMult)
+        else:
+            if _gear.type == "external":
+                _gear.Rrs = Rrs_ext
+                self.setText(self.ui.lb_Rrs2, self.G2.Rrs, self.units.lenMult)
+            elif _gear.type == "internal":
+                _gear.Rrs = Rrs_int
+                self.setText(self.ui.lb_Rrs2, self.G2.Rrs, self.units.lenMult)
 
-    def calcStandardRtcl(self):
-        if self.G1.Ros < 0 or self.G2.Ros < 0:
-            return
+        if _gear.Rr < 0 :
+            _gear.Rr = _gear.Rrs
 
-        addendum1 = self.G1.Ros - self.G1.Rs
-        addendum2 = self.G2.Ros - self.G2.Rs
+        if _gear.type == "internal":
+            if _gear.Rr < _gear.Rb:
+                _gear.Rr = _gear.Rrs
+            elif _gear.Rr > _gear.Rs:
+                _gear.Rr = _gear.Rrs
 
-        rtcl1 = (0.25 * addendum2) / self.units.lenMult
-        rtcl2 = (0.25 * addendum1) / self.units.lenMult
-
-        self.set_rtcl(self.G1, rtcl1)
-        self.set_rtcl(self.G2, rtcl2)
-
-        self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
-        self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
-
-        self.G1.Rrs = self.G1.Rs - addendum2 - self.rtcl1
-        self.G2.Rrs = self.G2.Rs - addendum1 - self.rtcl2
-
-        self.setText(self.ui.lb_Rrs1, self.G1.Rrs, self.units.lenMult)
-        self.setText(self.ui.lb_Rrs2, self.G2.Rrs, self.units.lenMult)
+        if self.G1.N > 0 and self.G2.N > 0:
+            if self.rtcl1 < 0:
+                self.set_rtcl(self.G1, rtcl)
+                self.setText(self.ui.le_rtcl1, self.rtcl1, self.units.lenMult)
+            if self.rtcl2 < 0:
+                self.set_rtcl(self.G2, rtcl)
+                self.setText(self.ui.le_rtcl2, self.rtcl2, self.units.lenMult)
 
     def updateRomax(self, _gear):
         if _gear.Rs > 0:
@@ -990,11 +958,11 @@ class jpgearqt(QWidget):
             _gear.Romax = _gear.Rb / cos(phi_A)
 
             if _gear.ID == 1:
-                # self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
                 self.setText(self.ui.lb_Romax1, self.G1.Romax, self.units.lenMult)
             else:
-                # self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
                 self.setText(self.ui.lb_Romax2, self.G2.Romax, self.units.lenMult)
+
+            self.set_Ro(_gear, _gear.Ro)
 
     def set_Ro(self, _gear, _Ro):
         if _gear.Romax < 0:
@@ -1003,18 +971,18 @@ class jpgearqt(QWidget):
         if is_number(_Ro):
             if float(_Ro) * self.units.lenMult > _gear.Romax:
                 _gear.Ro = _gear.Romax
-                if _gear.ID == 1:
-                    # self.ui.le_Ro1.setText(str("{:.3f}".format(self.G1.Ro)))
-                    self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
-                else:
-                    # self.ui.le_Ro2.setText(str("{:.3f}".format(self.G2.Ro)))
-                    self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
             else:
                 _gear.Ro = float(_Ro) * self.units.lenMult
+
+            if _gear.ID == 1:
+                self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
+            else:
+                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
             # check that Rtip is still valid, shrink if necessary
+            self.updateRootRadius(self.G1)
+            self.updateRootRadius(self.G2)
             self.updateMaxTipRadius(_gear)
             self.set_Rtip(_gear, _gear.Rtip)
-            self.updateCenterDistance()
 
     def updateMaxTipRadius(self, _gear):
         """
@@ -1089,10 +1057,8 @@ class jpgearqt(QWidget):
             if float(_Rtip) * self.units.lenMult > _gear.Rtip_max:
                 _gear.Rtip = _gear.Rtip_max
                 if _gear.ID == 1:
-                    # self.ui.le_Rtip1.setText(str("{:.3f}".format(_gear.Rtip)))
                     self.setText(self.ui.le_Rtip1, self.G1.Rtip, self.units.lenMult)
                 else:
-                    # self.ui.le_Rtip2.setText(str("{:.3f}".format(_gear.Rtip)))
                     self.setText(self.ui.le_Rtip2, self.G2.Rtip, self.units.lenMult)
             else:
                 _gear.Rtip = float(_Rtip) * self.units.lenMult
@@ -1106,19 +1072,15 @@ class jpgearqt(QWidget):
         if _gear.Ro < 0 and _gear.Ros > 0:
             _gear.Ro = _gear.Ros
             if _gear.ID == 1:
-                # self.ui.le_Ro1.setText(str("{:.3f}".format(_gear.Ro)))
                 self.setText(self.ui.le_Ro1, self.G1.Ro, self.units.lenMult)
             else:
-                # self.ui.le_Ro2.setText(str("{:.3f}".format(_gear.Ro)))
                 self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
 
         _gear.Roe = sqrt( _gear.Rb**2 + ( sqrt((_gear.Ro-_gear.Rtip)**2 - _gear.Rb**2) + _gear.Rtip )**2 )
 
         if _gear.ID == 1:
-            # self.ui.lb_Roe1.setText(str("{:.3f}".format(_gear.Roe)))
             self.setText(self.ui.lb_Roe1, self.G1.Roe, self.units.lenMult)
         else:
-            # self.ui.lb_Roe2.setText(str("{:.3f}".format(_gear.Roe)))
             self.setText(self.ui.lb_Roe2, self.G2.Roe, self.units.lenMult)
 
         self.updateContactRatio()
@@ -1158,17 +1120,22 @@ class jpgearqt(QWidget):
         self.setText(self.ui.lb_tt1, self.G1.tt, self.units.lenMult)
         self.setText(self.ui.lb_tt2, self.G2.tt, self.units.lenMult)
 
-        if self.ui.cb_CD_bkl.currentIndex() == 0:
-            # update center distance
-            self.CD = self.G1.Rp + self.G2.Rp
+        if self.ui.cb_CD_bkl.currentIndex() == 0: # update center distance
+            if self.G2.type == "external":
+                self.CD = self.G1.Rp + self.G2.Rp
+            elif self.G2.type == "internal":
+                self.CD = self.G2.Rp - self.G1.Rp
             self.setText(self.ui.lb_CD_value, self.CD, self.units.lenMult)
-        elif self.ui.cb_CD_bkl.currentIndex() == 1:
-            # update backlash
+
+        elif self.ui.cb_CD_bkl.currentIndex() == 1: # update backlash
             self.bkl = (tau*self.G1.Rp)/self.G1.N - self.G1.tt - self.G2.tt
             self.setText(self.ui.lb_bkl_value, self.bkl, self.units.lenMult)
 
         # Operating pressure angle at updated center distance
-        self.OPA = arccos((self.G1.Rb+self.G2.Rb) / self.CD)
+        if self.G2.type == "external":
+            self.OPA = arccos((self.G1.Rb+self.G2.Rb) / self.CD)
+        elif self.G2.type == "internal":
+            self.OPA = arccos((self.G2.Rb-self.G1.Rb) / self.CD)
         self.OPA_deg = rad2deg(self.OPA)
 
         self.updateContactRatio()
@@ -1194,8 +1161,7 @@ class jpgearqt(QWidget):
         bkl = self.bkl
         CD = self.CD
 
-        def func(x):
-            # variables for function: Rp1, Rp2, tt1, tt2
+        def func(x): # the input x is a vector: [Rp1, Rp2, tt1, tt2]
             F = zeros(4)
 
             # pitch circle is determined by mod and number of teeth => mod = Rp/N
@@ -1210,10 +1176,17 @@ class jpgearqt(QWidget):
 
             # use backlash
             if self.ui.cb_CD_bkl.currentIndex() == 0:
-                # circular pitch is sum of each tooth thickness and backlash
-                # (tau*Rp1)/N1 = tt1 + tt2 + bkl [equivalently, (tau*Rp2)/N2 = tt1 + tt2 + bkl]
-                # => (tau*Rp1)/N1 - tt1 - tt2 - bkl = 0
-                F[3] = (tau*x[0])/N1 - x[2] - x[3] - bkl
+                if self.G2.type == "external":
+                    # circular pitch is sum of each tooth thickness and backlash
+                    # (tau*Rp1)/N1 = tt1 + tt2 + bkl [equivalently, (tau*Rp2)/N2 = tt1 + tt2 + bkl]
+                    # => (tau*Rp1)/N1 - tt1 - tt2 - bkl = 0
+                    F[3] = (tau*x[0])/N1 - x[2] - x[3] - bkl
+                elif self.G2.type == "internal":
+                    # circular pitch is sum of each tooth thickness and backlash
+                    # internal gear tooth thickness is external tooth thickness plus backlash
+                    # tt2 = tt1 + bkl
+                    # => tt2 - tt1 - bkl = 0
+                    F[3] = x[3] - x[2] - bkl
             # use center distance
             elif self.ui.cb_CD_bkl.currentIndex() == 1:
                 # CD = Rp1 + Rp2
@@ -1231,31 +1204,55 @@ class jpgearqt(QWidget):
     def updateContactRatio(self):
         if self.G1.Rs < 0 or self.G2.Rs < 0:
             return
+        if self.G2.type == "external":
+            # AGMA-908 Parameters
+            # max line action, Rb to Rb
+            C6 = self.CD * sin(self.OPA)
+            # start of line of contact, when G2 is at Roe
+            C1 = C6 - sqrt(self.G2.Roe**2 - self.G2.Rb**2)
+            # end of line of contact, when G1 is at Roe
+            C5 = sqrt(self.G1.Roe**2 - self.G1.Rb**2)
+            # point where line of contact intersects center line (not used)
+            #C3 = (self.G1.N/(self.G1.N+self.G2.N)) * C6
 
-        # AGMA-908 Parameters
-        # max line action, Rb to Rb
-        self.C6 = self.CD * sin(self.OPA)
-        # start of line of contact, when G2 is at Roe
-        self.C1 = self.C6 - sqrt(self.G2.Roe**2 - self.G2.Rb**2)
-        # end of line of contact, when G1 is at Roe
-        self.C5 = sqrt(self.G1.Roe**2 - self.G1.Rb**2)
-        # point where line of contact intersects center line
-        self.C3 = (self.G1.N/(self.G1.N+self.G2.N)) * self.C6
-        # lowest point of single tooth contact for G1
-        self.C2 = self.C5 - self.G1.Pb
-        # highest point of single tooth contact for G1
-        self.C4 = self.C1 + self.G1.Pb
+            # Line of contact
+            LoC = C5 - C1;
+            # Contact ratio
+            self.CR = LoC / self.G1.Pb;
+            self.setText(self.ui.lb_CR, self.CR, 1)
+            if is_number(self.CR):
+                # minimum number of teeth engaged at any time
+                n = int(self.CR)
 
-        # Line of contact
-        self.LoC = self.C5 - self.C1;
+                # lowest point of single tooth contact for G1
+                C2 = C5 - n*self.G1.Pb
+                # highest point of single tooth contact for G1
+                C4 = C1 + n*self.G1.Pb
 
-        # Contact ratio
-        self.CR = self.LoC / self.G1.Pb;
-        self.setText(self.ui.lb_CR, self.CR, 1)
+                # Highest point of single tooth contact
+                self.G1.Rhp = sqrt(self.G1.Rb**2 + C4**2)
+                self.G2.Rhp = sqrt(self.G2.Rb**2 + (C6-C2)**2)
 
-        # Highest point of single tooth contact
-        self.G1.Rhp = sqrt(self.G1.Rb**2 + self.C4**2);
-        self.G2.Rhp = sqrt(self.G2.Rb**2 + (self.C6-self.C2)**2);
+        elif self.G2.type == "internal":
+            # GOIG 12.30
+            E1P = self.G1.Rb * tan(self.OPA)
+            E2P = self.G2.Rb * tan(self.OPA)
+            E1T1 = sqrt(self.G1.Roe**2 - self.G1.Rb**2)
+            E2T2 = sqrt(self.G2.Rr**2 - self.G2.Rb**2)
+            E1T2 = E1P - (E2P - E2T2)
+
+            # Line of contact
+            LoC = (E2P - E2T2) + (E1T1 - E1P)
+
+            # Contact ratio
+            self.CR = LoC / self.G1.Pb;
+            self.setText(self.ui.lb_CR, self.CR, 1)
+            if is_number(self.CR):
+                # minimum number of teeth engaged at any time
+                n = int(self.CR)
+                # Highest point of single tooth contact
+                self.G1.Rhp = sqrt(self.G1.Rb**2 + (E1T2 + n*self.G1.Pb)**2)
+                self.G2.Rhp = sqrt(self.G2.Rb**2 + (E2T2 + n*self.G2.Pb)**2)
 
     def set_rtcl(self, _gear, _rtcl):
         if is_number(_rtcl):
@@ -1266,19 +1263,38 @@ class jpgearqt(QWidget):
                 self.rtcl2 = float(_rtcl) * self.units.lenMult
                 self.updateRootRadius(self.G2)
 
+    def set_Rr(self, _Rr):
+        if is_number(_Rr):
+            self.G2.Rr = float(_Rr) * self.units.lenMult
+            self.checkUndercut(self.G2)
+            self.updateMaxRootFillet(self.G2)
+            self.updateRootRadius(self.G1)
+
     def updateRootRadius(self, _gear):
         if self.CD < 0:
             return
 
         if _gear.ID == 1:
-            self.G1.Rr = self.CD - self.G2.Ro - self.rtcl1
+            if self.G2.type == "external":
+                self.G1.Rr = self.CD - self.G2.Ro - self.rtcl1
+            elif self.G2.type == "internal":
+                self.G1.Rr = self.G2.Rr - self.CD - self.rtcl1
+                self.updateContactRatio()
             self.setText(self.ui.lb_Rr1, self.G1.Rr, self.units.lenMult)
         else:
-            self.G2.Rr = self.CD - self.G1.Ro - self.rtcl2
-            self.setText(self.ui.lb_Rr2, self.G2.Rr, self.units.lenMult)
+            if self.G2.type == "external":
+                self.G2.Rr = self.CD - self.G1.Ro - self.rtcl2
+                self.setText(self.ui.le_Rr2, self.G2.Rr, self.units.lenMult)
+            elif self.G2.type == "internal":
+                self.G2.Ro = self.CD + self.G1.Ro + self.rtcl2
+                self.updateRoe(self.G2)
+                self.updateMaxTipRadius(self.G2)
+                self.set_Rtip(self.G2, self.G2.Rtip)
+                self.setText(self.ui.le_Ro2, self.G2.Ro, self.units.lenMult)
+                self.setText(self.ui.le_Rr2, self.G2.Rr, self.units.lenMult)
 
-        self.updateMaxRootFillet(_gear)
         self.checkUndercut(_gear)
+        self.updateMaxRootFillet(_gear)
 
     def updateMaxRootFillet(self, _gear):
         if _gear.N < 0 or _gear.Rr < 0:
@@ -1426,546 +1442,14 @@ class jpgearqt(QWidget):
             _gear.phi_JFI = phi_A
             _gear.theta_F = theta_F
 
+    def set_Rrim(self, _gear, _Rrim):
+        if is_number(_Rrim):
+            _gear.Rrim = float(_Rrim) * self.units.lenMult
+
+# Stress ######################################################################
     def set_FW(self, _gear, _FW):
         if is_number(_FW):
             _gear.FW = float(_FW) * self.units.lenMult
-
-# Drawing #####################################################################
-    def layoutGear(self, _gear, save=False):
-        G = _gear
-
-        if G.N < 1:
-            return
-
-        curveList = []
-        curveColor = 'b'
-        curveWidth = 2
-
-        # Involute
-        # find staring point of involute
-        Rjfi = G.Rb/(cos(G.phi_JFI))
-        theta_JFI = G.tts/(2*G.Rs) + invF(self.PA) - invF(G.phi_JFI)
-        Rjfi_x = Rjfi*sin(theta_JFI)
-        Rjfi_y = Rjfi*cos(theta_JFI)
-        # create vectors of points along the involute
-        RA = linspace(Rjfi, G.Roe, 20)
-        phi_A = arccos(G.Rb/RA)
-        theta_A = (G.tts/(2*G.Rs)) + invF(self.PA) - invF(phi_A)
-        RAx = RA*sin(theta_A)
-        RAy = RA*cos(theta_A)
-        # add right side
-        invPath = mpath.Path( list(map(list, zip(*[RAx, RAy]))) )
-        invPatch = mpatch.PathPatch(invPath, color=curveColor, linewidth=curveWidth, fill=False)
-        curveList.append(invPatch)
-        # add left side
-        invPath = mpath.Path( list(map(list, zip(*[-RAx, RAy]))) )
-        invPatch = mpatch.PathPatch(invPath, color=curveColor, linewidth=curveWidth, fill=False)
-        curveList.append(invPatch)
-
-        # Root fillet radius
-        if G.Rf > 0:
-            # find center of fillet circle
-            Fx = (G.Rr + G.Rf)*sin(G.theta_F)
-            Fy = (G.Rr + G.Rf)*cos(G.theta_F)
-            # find arc angles
-            filletStartAngle = 180 + rad2deg(G.phi_JFI - theta_JFI);
-            filletEndAngle = 360 - 90 - rad2deg(G.theta_F);
-            curveList.append(mpatch.Arc(
-                                        (Fx,Fy),
-                                        G.Rf*2, G.Rf*2,
-                                        theta1=filletStartAngle, theta2=filletEndAngle,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-            curveList.append(mpatch.Arc(
-                                        (-Fx,Fy),
-                                        G.Rf*2, G.Rf*2,
-                                        theta1=180-filletEndAngle, theta2=180-filletStartAngle,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-
-        # add straight line segment if undercut
-        if G.undercut == True:
-            theta_A = G.tts/(2*G.Rs) + invF(self.PA)
-            Rjfi = (G.Rr + G.Rf) * cos(G.theta_F - theta_A)
-            Rjfi_x = Rjfi*sin(theta_A)
-            Rjfi_y = Rjfi*cos(theta_A)
-
-            Rb_x = G.Rb*sin(theta_A)
-            Rb_y = G.Rb*cos(theta_A)
-
-            line = mpath.Path([[Rjfi_x, Rjfi_y], [Rb_x, Rb_y]])
-            linePatch = mpatch.PathPatch(line, color=curveColor, linewidth=curveWidth, fill=False)
-            curveList.append(linePatch)
-            line = mpath.Path([[-Rjfi_x, Rjfi_y], [-Rb_x, Rb_y]])
-            linePatch = mpatch.PathPatch(line, color=curveColor, linewidth=curveWidth, fill=False)
-            curveList.append(linePatch)
-
-        # Root Radius
-        if G.Rf < G.Rff:
-            RRStartAngle1 = rad2deg(G.theta_F) + 90
-            RREndAngle1 = rad2deg(pi/G.N) + 90
-            RRStartAngle2 = -rad2deg(pi/G.N) + 90
-            RREndAngle2 = -rad2deg(G.theta_F) + 90
-            curveList.append(mpatch.Arc(
-                                        (0, 0),
-                                        G.Rr*2, G.Rr*2,
-                                        theta1=RRStartAngle1, theta2=RREndAngle1,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-            curveList.append(mpatch.Arc(
-                                        (0, 0),
-                                        G.Rr*2, G.Rr*2,
-                                        theta1=RRStartAngle2, theta2=RREndAngle2,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-
-        # Tip Radius
-        if G.Rtip > 0:
-            # point where tip touches involute
-            phi_Atip = arccos(G.Rb/G.Roe);
-            theta_Atip = (G.tts/(2*G.Rs)) + invF(self.PA) - invF(phi_Atip);
-            # point where tip touches OD
-            CF = G.Ro - G.Rtip; # distance from gear center to fillet center
-            phi_Otip = arccos(G.Rb/CF);
-            theta_Otip = theta_Atip - phi_Atip + phi_Otip;
-            # Center point
-            Rtip_x = CF*sin(theta_Otip);
-            Rtip_y = CF*cos(theta_Otip);
-            # find arc angles
-            tipStartAngle = rad2deg(phi_Atip - theta_Atip);
-            tipEndAngle = 90 - rad2deg(theta_Otip);
-            curveList.append(mpatch.Arc(
-                                        (Rtip_x,Rtip_y),
-                                        G.Rtip*2, G.Rtip*2,
-                                        theta1=tipStartAngle, theta2=tipEndAngle,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-            curveList.append(mpatch.Arc(
-                                        (-Rtip_x,Rtip_y),
-                                        G.Rtip*2, G.Rtip*2,
-                                        theta1=180-tipEndAngle, theta2=180-tipStartAngle,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-
-        # Outer Radius
-        if G.Rtip < G.Rtip_max:
-            if 'theta_Otip' in locals():
-                    theta_O = theta_Otip
-            else:
-                    phi_O = arccos(G.Rb/G.Roe);
-                    theta_O = (G.tts/(2*G.Rs)) + invF(self.PA) - invF(phi_O);
-            ODStartAngle = -rad2deg(theta_O) + 90
-            ODEndAngle = rad2deg(theta_O) + 90
-            curveList.append(mpatch.Arc(
-                                        (0,0),
-                                        G.Ro*2, G.Ro*2,
-                                        #angle=90,
-                                        theta1=ODStartAngle, theta2=ODEndAngle,
-                                        color=curveColor,
-                                        linewidth=curveWidth
-                                        )
-                            )
-
-        if save == True:
-            if G.ID == 1:
-                defaultName = 'gear1.dxf'
-            else:
-                defaultName = 'gear2.dxf'
-
-            savePath, selectedFilter = QFileDialog.getSaveFileName(self, 'Save Gear'+str(G.ID), defaultName)
-
-            if savePath == '':
-                return
-
-            doc = ezdxf.new()
-            if self.units.lenName == "mm":
-                doc.units = ezdxf.units.MM
-            elif self.units.lenName == "in":
-                doc.units = ezdxf.units.IN
-
-            scale = 1 / self.units.lenMult
-
-            msp = doc.modelspace()
-
-            for n in range(G.N):
-                    angle = (n/G.N)*tau
-                    ucs = UCS(origin=(0,0,0)).rotate_local_z(angle)
-
-                    # involute
-                    msp.add_lwpolyline(list(zip(RAx, RAy))).transform(ucs.matrix).scale(scale, scale, scale)
-                    msp.add_lwpolyline(list(zip(-RAx, RAy))).transform(ucs.matrix).scale(scale, scale, scale)
-
-                    # root fillet
-                    if G.Rf > 0:
-                            msp.add_arc((Fx, Fy), radius=G.Rf, start_angle=filletStartAngle, end_angle=filletEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
-                            msp.add_arc((-Fx, Fy), radius=G.Rf, start_angle=180-filletEndAngle, end_angle=180-filletStartAngle).transform(ucs.matrix).scale(scale, scale, scale)
-
-                    # add straight line segment if undercut
-                    if G.undercut == True:
-                            msp.add_line((Rjfi_x, Rjfi_y), (Rb_x, Rb_y)).transform(ucs.matrix).scale(scale, scale, scale)
-                            msp.add_line((-Rjfi_x, Rjfi_y), (-Rb_x, Rb_y)).transform(ucs.matrix).scale(scale, scale, scale)
-
-                    # root radius
-                    if G.Rf < G.Rff :
-                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle1, end_angle=RREndAngle1).transform(ucs.matrix).scale(scale, scale, scale)
-                            msp.add_arc((0, 0), radius=G.Rr, start_angle=RRStartAngle2, end_angle=RREndAngle2).transform(ucs.matrix).scale(scale, scale, scale)
-
-                    # tip radius
-                    if G.Rtip > 0:
-                            msp.add_arc((Rtip_x,Rtip_y), radius=G.Rtip, start_angle=tipStartAngle, end_angle=tipEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
-                            msp.add_arc((-Rtip_x,Rtip_y), radius=G.Rtip, start_angle=180-tipEndAngle, end_angle=180-tipStartAngle).transform(ucs.matrix).scale(scale, scale, scale)
-
-                    # outer radius
-                    if G.Rtip < G.Rtip_max:
-                            msp.add_arc((0, 0), radius=G.Ro, start_angle=ODStartAngle, end_angle=ODEndAngle).transform(ucs.matrix).scale(scale, scale, scale)
-
-            zoom.extents(msp)
-            doc.saveas(str(savePath))
-
-        # save == False
-        else:
-            # make copies of all the teeth
-            fullList = []
-            for n in range(G.N):
-                angle = (n/G.N)*tau
-                for curve in curveList:
-                    newCurve = copy.copy(curve)
-                    newCurve.set_transform(mtransforms.Affine2D().rotate(angle))
-                    fullList.append(newCurve)
-
-            curveCollection = mcollections.PatchCollection(fullList, match_original=True)
-            return curveCollection
-
-    def addCircles(self, _gear, _canvas, _legend=True):
-        if _gear.Rb < 0:
-            return None
-
-        circleList = []
-        # base circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Rb / self.units.lenMult, color='c', ls='--', fill=False, label='Base Circle'))
-        # # pitch circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Rp / self.units.lenMult, color='y', ls='--', fill=False, label='Pitch Circle'))
-        # # outer circle
-        circleList.append(pyplot.Circle((0, 0), _gear.Roe / self.units.lenMult, color='g', ls='--', fill=False, label='Outer Circle'))
-        # # root cirlce
-        circleList.append(pyplot.Circle((0, 0), _gear.Rr / self.units.lenMult, color='r', ls='--', fill=False, label='Root Circle'))
-
-        # adding a legend only works if the circles are added individually, instead of as a collection
-        if _legend == True:
-            for circle in circleList:
-                _canvas.axes.add_patch(circle)
-
-            legendCircle = _canvas.axes.legend(loc='upper right', framealpha=1.0)
-            _canvas.axes.add_artist(legendCircle)
-
-        else:
-            circleCollection = mcollections.PatchCollection(circleList, match_original=True)
-            return circleCollection
-
-    def drawGear(self, _gear, _updateAxes = False):
-        if _gear.Rb < 0:
-            return
-
-        if _gear.ID == 1:
-            canvas = self.canvasG1
-            cb_singleTooth = self.ui.cb_singleViewG1
-            cb_circles = self.ui.cb_circlesG1
-        else:
-            canvas = self.canvasG2
-            cb_singleTooth = self.ui.cb_singleViewG2
-            cb_circles = self.ui.cb_circlesG2
-
-        if _updateAxes == False:
-            leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
-        else:
-            # single tooth view
-            if cb_singleTooth.isChecked():
-                rightLimit = (_gear.Rp*sin(tau/_gear.N)) / self.units.lenMult
-                leftLimit = -rightLimit
-                topLimit = (_gear.Rp / self.units.lenMult) + rightLimit
-                bottomLimit = (_gear.Rp / self.units.lenMult) - rightLimit
-            # full gear view
-            else:
-                rightLimit = (_gear.Ro * 1.1) / self.units.lenMult
-                leftLimit = -rightLimit
-                topLimit = rightLimit
-                bottomLimit = leftLimit
-
-        canvas.axes.cla()
-
-        canvas.axes.set_aspect('equal')
-        canvas.axes.set_box_aspect(1)
-        canvas.fig.tight_layout()
-
-        canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-        canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
-        curveCol = self.layoutGear(_gear)
-        curveCol.set_transform(mtransforms.Affine2D().scale(1/self.units.lenMult) + canvas.axes.transData)
-        if _gear.ID == 2:
-            curveCol.set_edgecolor('r')
-        canvas.axes.add_collection(curveCol)
-
-        if cb_circles.isChecked():
-            self.addCircles(_gear, canvas, _legend=True)
-
-        canvas.draw()
-
-    def drawStress(self, _gear, _canvas, _lewisParams):
-        # setup canvas
-        rightLimit = _gear.Rp*sin(tau/_gear.N)
-        leftLimit = -rightLimit
-        topLimit = _gear.Rp + rightLimit
-        bottomLimit = _gear.Rp - rightLimit
-
-        _canvas.axes.cla()
-
-        _canvas.axes.set_aspect('equal')
-        _canvas.axes.set_box_aspect(1)
-        _canvas.fig.tight_layout()
-
-        _canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-        _canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
-        # add teeth
-        curveCol = self.layoutGear(_gear)
-        if _gear.ID == 2:
-            curveCol.set_edgecolor('r')
-        _canvas.axes.add_collection(curveCol)
-        # add parabola
-        Rd, gamma, x_Lewis, y_Lewis, a_Lewis = _lewisParams
-        x_span = linspace(-x_Lewis*1.1, x_Lewis*1.1, 25)
-        y_span = a_Lewis*x_span**2 + Rd
-
-        paraPath = mpath.Path( list(map(list, zip(*[x_span, y_span]))) )
-        paraPatch = mpatch.PathPatch(paraPath, color='g', linestyle='--', linewidth=1, fill=False, label='Lewis Parabola')
-        _canvas.axes.add_patch(paraPatch)
-        # add fillet circle
-        # Fx = (_gear.Rr + _gear.Rf)*sin(_gear.theta_F)   # center of fillet circle
-        # Fy = (_gear.Rr + _gear.Rf)*cos(_gear.theta_F)
-        # _canvas.axes.add_patch(pyplot.Circle((Fx, Fy), _gear.Rf, color='c', ls='--', fill=False))
-        # add intersection points
-        _canvas.axes.plot([x_Lewis], [y_Lewis], color='tab:orange', marker='o', linewidth=2)
-        _canvas.axes.plot([-x_Lewis], [y_Lewis], color='tab:orange', marker='o', linewidth=2)
-        # Highest point of single tooth contact
-        phi_hp = arccos(_gear.Rb/_gear.Rhp)
-        theta_hp = (_gear.tts/(2*_gear.Rs)) + invF(self.PA) - invF(phi_hp)
-        Rhp_x = _gear.Rhp*sin(theta_hp)
-        Rhp_y = _gear.Rhp*cos(theta_hp)
-        _canvas.axes.plot([Rhp_x, 0], [Rhp_y, Rd], color='k', linestyle='--', linewidth=1)
-        # _canvas.axes.plot([Rhp_x], [Rhp_y], color='r', marker='*', markersize=10, linestyle='', linewidth=3)
-        # force vector arrow
-        arrowSlope = (Rhp_y - Rd)/Rhp_x                 # rise over run
-        tail_y = Rhp_y + (Rhp_y - Rd)*2                   # pick an arbitrary tail height
-        tail_x = (tail_y - Rhp_y)/arrowSlope + Rhp_x    # calc tail_x to match slope
-        dx = Rhp_x - tail_x
-        dy = Rhp_y - tail_y
-        arrowLength = sqrt(dx**2 + dy**2)
-        tailWidth = arrowLength / 50
-        arrow = mpatch.FancyArrow(tail_x, tail_y, dx, dy, width=tailWidth, length_includes_head=True, color='k')
-        _canvas.axes.add_patch(arrow)
-
-        _canvas.axes.legend(loc='upper right', framealpha=1.0)
-        _canvas.draw()
-
-    def drawMesh(self, _updateAxes = False):
-        if self.G1.Rb < 0 or self.G2.Rb < 0:
-            return
-
-        canvas = self.canvasMesh
-        cb_singleTooth = self.ui.cb_singleViewMesh
-        cb_circles = self.ui.cb_circlesMesh
-
-        if _updateAxes == False:
-            leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
-        else:
-            # mesh view
-            if cb_singleTooth.isChecked():
-                topLimit = (self.G1.Rp*sin(tau/self.G1.N)) / self.units.lenMult
-                bottomLimit = -topLimit
-                leftLimit = (self.G1.Rp / self.units.lenMult) - topLimit
-                rightLimit = (self.G1.Rp / self.units.lenMult) + topLimit
-            # full gear view
-            else:
-                sizeBuffer = 1.1
-                leftLimit = (-self.G1.Ro * sizeBuffer) / self.units.lenMult
-                rightLimit = (self.CD + self.G2.Ro * sizeBuffer) / self.units.lenMult
-                topLimit = (max(self.G1.Ro, self.G2.Ro) * sizeBuffer) / self.units.lenMult
-                bottomLimit = -topLimit
-
-        canvas.axes.cla()
-
-        canvas.axes.set_aspect('equal')
-        canvas.axes.set_box_aspect(1)
-        canvas.fig.tight_layout()
-
-        canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-        canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
-        # Points for line of contact
-        # pitch point
-        x0 = self.G1.Rp
-        y0 = 0
-        # tangent to gear 1
-        x1 = self.G1.Rb*cos(self.OPA)
-        y1 = self.G1.Rb*sin(self.OPA)
-        # tangent to gear 2
-        x2 = self.CD - self.G2.Rb*cos(self.OPA)
-        y2 = -self.G2.Rb*sin(self.OPA)
-        # on LoC at Roe2
-        # law of sines - A/sin(a) = B/sin(b)
-        b = arcsin( (self.G2.Rp/self.G2.Roe) * sin(self.OPA + deg2rad(90)) )
-        c = pi - b - self.OPA - deg2rad(90)
-        x3 = self.CD - (self.G2.Roe * cos(c))
-        y3 = self.G2.Roe * sin(c)
-        b = arcsin( (self.G1.Rp/self.G1.Roe) * sin(self.OPA + deg2rad(90)) )
-        c = pi - b - self.OPA - deg2rad(90)
-        x4 = (self.G1.Roe * cos(c))
-        y4 = -(self.G1.Roe * sin(c))
-        # scale to the right units
-        x1 = x1 / self.units.lenMult
-        x2 = x2 / self.units.lenMult
-        x3 = x3 / self.units.lenMult
-        x4 = x4 / self.units.lenMult
-        y1 = y1 / self.units.lenMult
-        y2 = y2 / self.units.lenMult
-        y3 = y3 / self.units.lenMult
-        y4 = y4 / self.units.lenMult
-
-        # config slider
-        slider = self.ui.hSlider_Mesh
-        sliderMin = 0
-        # pitch point happens at slider=1
-        # find overshoot for gear two
-        a = arctan(-y2/x2)
-        overshoot = a / self.OPA
-        sliderMax = 1 + overshoot
-
-        slider.setMinimum(int(sliderMin * self.sliderScale))
-        slider.setMaximum(int(sliderMax * self.sliderScale))
-
-        # make the teeth mesh nicely
-        ratio = self.G1.N / self.G2.N
-        # profile angle at pitch circle
-        phi_P1 = arccos(self.G1.Rb/self.G1.Rp)
-        phi_P2 = arccos(self.G2.Rb/self.G2.Rp)
-        # tooth thickness at pitch circle
-        theta_P1 = self.G1.tt/(2*self.G1.Rp)
-        theta_P2 = self.G2.tt/(2*self.G2.Rp)
-
-        startAngle1 = -pi/2 + theta_P1
-        startAngle2 = pi/2 + theta_P2
-
-        curveStartAngle1 = startAngle1 + self.OPA + invF(self.OPA)
-        curveStartAngle2 = startAngle2 - ratio * (self.OPA + invF(self.OPA))
-
-        phi_A = float(slider.value() / self.sliderScale) * self.OPA
-        updateAngle = phi_A + invF(phi_A)
-
-        angle1 = curveStartAngle1 - (updateAngle)
-        angle2 = curveStartAngle2 + (updateAngle * ratio)
-
-        # draw everything
-        curveCol1 = self.layoutGear(self.G1)
-        curveCol2 = self.layoutGear(self.G2)
-        curveCol2.set_edgecolor('r')
-
-        curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/self.units.lenMult) + canvas.axes.transData)
-        curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/self.units.lenMult).translate(self.CD/self.units.lenMult, 0) + canvas.axes.transData)
-
-        canvas.axes.add_collection(curveCol1)
-        canvas.axes.add_collection(curveCol2)
-
-        if cb_circles.isChecked():
-            self.addCircles(self.G1, canvas, _legend=True)
-
-            circleCol2 = self.addCircles(self.G2, canvas, _legend=False)
-            circleCol2.set_transform(mtransforms.Affine2D().translate(self.CD/self.units.lenMult, 0) + canvas.axes.transData)
-            canvas.axes.add_collection(circleCol2)
-
-        if self.ui.cb_LoC.isChecked():
-            # line of contact
-            canvas.axes.plot([x1,x2],[y1,y2], color='k', marker='x', linestyle='--', linewidth=1)
-            loc, = canvas.axes.plot([x3,x4],[y3,y4], color='k', marker='x', linewidth=2, label='Line of Contact')
-            # contact point
-            traceAngle = self.OPA - phi_A
-            R = (self.G1.Rb/cos(phi_A)) / self.units.lenMult
-            traceX = R*cos(traceAngle)
-            traceY = R*sin(traceAngle)
-            tracePoint, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
-            legendPoint = canvas.axes.legend(handles=[loc, tracePoint], loc='lower left', framealpha=1.0)
-            canvas.axes.add_artist(legendPoint)
-
-        canvas.draw()
-
-    def createAnimWindow(self):
-        if self.G1.Rb < 0 or self.G2.Rb < 0:
-            return
-
-        window = popupWindow(self)
-        window.setWindowTitle("Mesh Animation")
-
-        window.ui.vLayout_popup.insertWidget(0, window.canvas)
-        toolbar = NavigationToolbar2QT(window.canvas, self)
-        window.ui.hLayout_toolbarAnim.insertWidget(0, toolbar)
-
-        sizeBuffer = 1.1
-        leftLimit = (-self.G1.Ro * sizeBuffer) / self.units.lenMult
-        rightLimit = (self.CD + self.G2.Ro * sizeBuffer) / self.units.lenMult
-        topLimit = (max(self.G1.Ro, self.G2.Ro) * sizeBuffer) / self.units.lenMult
-        bottomLimit = -topLimit
-
-        window.canvas.axes.set_aspect('equal')
-        # window.canvas.axes.set_box_aspect(1)
-        window.canvas.fig.tight_layout()
-
-        window.canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-        window.canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
-        curveCol1 = self.layoutGear(self.G1)
-        curveCol2 = self.layoutGear(self.G2)
-        curveCol2.set_edgecolor('r')
-
-        window.canvas.axes.add_collection(curveCol1)
-        window.canvas.axes.add_collection(curveCol2)
-
-        # animation specs
-        slider = window.ui.hSlider_Speed
-        maxSpeed = slider.maximum()             # RPM
-        msPerRev = (60*1000)/maxSpeed           # milliseconds per revolution
-        interval = 30                           # ms per frame
-        framesPerRev = int(msPerRev / interval)	# frames for one rev
-        ratio = self.G1.N / self.G2.N
-
-        def animFunc(frame, _maxSpeed, _slider):
-            speed = float(_slider.value())
-            updateAngle = (speed/_maxSpeed) * (tau*frame)/framesPerRev
-
-            angle1 = (-pi/2) - updateAngle
-            angle2 = pi/2 + pi/self.G2.N - 0.5*self.bkl/self.G2.Rs + ratio*updateAngle
-
-            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/self.units.lenMult) + window.canvas.axes.transData)
-            curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/self.units.lenMult).translate(self.CD/self.units.lenMult, 0) + window.canvas.axes.transData)
-
-        self.anim = manimation.FuncAnimation(window.canvas.fig, animFunc, fargs=[maxSpeed, slider], frames=framesPerRev, interval=interval)
-
-        window.canvas.draw()
-
-        window.show()
-
-# Stress ######################################################################
     def set_RPM(self, _RPM):
         if is_number(_RPM):
             self.RPM = float(_RPM)
@@ -1994,156 +1478,9 @@ class jpgearqt(QWidget):
         # convert torque to force through HPSTC tangent to base circle
         w = self.torque / (self.G1.Rb * FW)
 
-        self.calcPitchLineVelocity()
-        self.calcContactStress(w)
-        self.calcBendingStress(w)
-
-    def calcPitchLineVelocity(self):
-        velocity = (tau * self.G1.Rp * (self.RPM / 60)) / 1000
-        self.setText(self.ui.lb_pitchLineVel, velocity, self.units.velMult)
-
-    def calcContactStress(self, _w):
-        # elastic coefficient
-        E1 = self.G1.E
-        E2 = self.G2.E
-        nu1 = self.G1.nu
-        nu2 = self.G2.nu
-
-        Cp = 1/sqrt( (pi*(1-nu1**2)/E1) + (pi*(1-nu2**2)/E2) )
-
-        # max contact stress occurs at lowest point of single tooth contact
-        rho1 = sqrt(self.G1.Roe**2 - self.G1.Rb**2) - self.G1.Pb    # AGMA C2
-        rho2 = self.G1.Rb*self.G2.Rb*tan(self.OPA) - rho1           # AGMA C6 - C2
-
-        stress = Cp * sqrt(_w*( (rho1+rho2)/(rho1*rho2) ))
-
-        self.setText(self.ui.lb_stressC1, stress, self.units.pressureMult)
-        self.setText(self.ui.lb_stressC2, stress, self.units.pressureMult)
-
-    def calcBendingStress(self, _w):
-        # Stress concentration factor Kf
-        # from GOIG 11.24 - 11.26
-        # Note that GOIG uses degrees while AGMA 908 uses radians
-        k1 = 0.3054 - 0.00489*self.OPA_deg - 0.000069*self.OPA_deg**2
-        k2 = 0.3620 - 0.01268*self.OPA_deg + 0.000104*self.OPA_deg**2
-        k3 = 0.2934 + 0.00609*self.OPA_deg + 0.000087*self.OPA_deg**2
-
-        for _gear, _canvas in zip([self.G1, self.G2], [self.canvasStress1, self.canvasStress2]):
-
-            # Lewis parabola key points
-            lewisParams = self.lewisParabola(_gear)
-            Rd, gamma, x_Lewis, y_Lewis, a_Lewis = lewisParams
-
-            # Lewis parabola dimensions
-            tt_LP = 2*x_Lewis       # tooth thickness at critical section
-            h_LP = Rd - y_Lewis     # height of Lewis parabola
-
-            # please don't divide by zero
-            if _gear.Rf < 0.001:
-                self.set_Rf(_gear, 0.001)
-
-            Kf = k1 + ( (tt_LP/_gear.Rf)**k2 ) * ( (tt_LP/h_LP)**k3 )
-
-            stress = (_w/self.mod) * cos(gamma) * (Kf*( ((1.5*self.mod*h_LP)/ x_Lewis**2) -
-                                    (0.5*self.mod*tan(gamma))/x_Lewis ) )
-
-            if _gear.ID == 1:
-                self.setText(self.ui.lb_stressB1, stress, self.units.pressureMult)
-            else:
-                self.setText(self.ui.lb_stressB2, stress, self.units.pressureMult)
-
-            # draw tooth
-            self.drawStress(_gear, _canvas, lewisParams)
-
-    def lewisParabola(self, _gear):
-        """
-        # Find the intersection point of the Lewis parabola and the root fillet circle
-        #
-        # Parameters:
-        # Fx, Fy - centerpoint of root fillet circle
-        # Rf - root fillet radius
-        # Rd - intersection of tooth centerline and force vector; the top of the Lewis
-        #   parabola
-        #
-        # Output variables:
-        # x, y - point of intersection between the Lewis parabola and the root fillet
-        # a - scale of parabola, => y = ax^2 + bx + c
-        #-------------------------------------------------------------------------------
-
-        # Equation of a circle: (y-v)^2 + (x-h)^2 = r^2
-        # Substitute values for fillet circle: (y-Fy)^2 + (x-Fx)^2 = Rf^2
-        # Rearrange: y = +/-sqrt(Rf^2 - (x-Fx)^2) + Fy
-        # We are only interested in the bottom half of the circle:
-        # [1] y = -sqrt(Rf^2 - (x-Fx)^2) + Fy
-        # Implicit differentiation of [1]:
-        # [2] dy/dx = -(x-Fx)/(y-Fy)
-        #
-        # Equation of a parabola: y = ax^2 + bx + c
-        # Substitute values of Lewis parabola, and note that the parabola is
-        # centered on the y-axis, i.e. b=0:
-        # [3] y = ax^2 + Rd
-        # Differentiate [3]:
-        # [4] dy/dx = 2ax
-        #
-        # At the tangent intersection of the parabola and circle, the derivatives
-        # are equal:
-        # [5] -(x-Fx)/(y-Fy) = 2ax
-        # Rearrange [5]:
-        # [6] a = -(x-Fx)/(2x)(y-Fy)
-        # Substitute [6] into [3]:
-        # y = -(x)(x-Fx)/(2)(y-Fy) + Rd
-        # y^2 - Fy*y - Rd*y = (-x^2 + Fx*x)/2 - Rd*Fy
-        # Complete the square:
-        # [y^2 -(Fy+Rd)*y + (Fy+Rd)^2/4] - (Fy+Rd)^2/4 = (-x^2 + Fx*x)/2 - Rd*Fy
-        # [y - (Fy+Rd)/2]^2  = (-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4
-        # y - (Fy+Rd)/2 = +/-sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4]
-        # [7] y = +/-sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2
-        # We are only interested in the bottom half of the circle:
-        # [8] y = -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2
-        # Eq [8] must intersect Eq [1]:
-        # -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2 = -sqrt(Rf^2 - (x-Fx)^2) + Fy
-        # Rearrange to find the zero:
-        # [9] -sqrt[(-x^2 + Fx*x)/2 - Rd*Fy + (Fy+Rd)^2/4] + (Fy+Rd)/2 +
-        #   sqrt(Rf^2 - (x-Fx)^2) - Fy = 0
-        """
-
-        # Highest point of single tooth contact
-        phi_hp = arccos(_gear.Rb/_gear.Rhp)
-        theta_hp = (_gear.tts/(2*_gear.Rs)) + invF(self.PA) - invF(phi_hp)
-        Rhp_x = _gear.Rhp*sin(theta_hp)
-        Rhp_y = _gear.Rhp*cos(theta_hp)
-
-        # angle between force normal direction and
-        # perpendicular to tooth centerline
-        gamma = phi_hp - theta_hp
-
-        # top of Lewis parabola
-        Rd = _gear.Rb / cos(gamma)
-        # alternately, Rd = Rhp_y - Rhp_x*tan(gamma) (GOIG 11.22)
-
-        # find center of fillet circle
-        Fx = (_gear.Rr + _gear.Rf)*sin(_gear.theta_F)
-        Fy = (_gear.Rr + _gear.Rf)*cos(_gear.theta_F)
-
-        if _gear.Rf == 0:
-            x = Fx
-            y = Fy
-            a = (y-Rd)/(x**2)
-        else:
-            # Eq [9] above
-            def func(x):
-                return real(-sqrt( (-(x**2) + Fx*x)/2 - Rd*Fy + ((Fy+Rd)**2)/4) + (Fy+Rd)/2 +
-                        sqrt(_gear.Rf**2 - (x-Fx)**2) - Fy)
-
-            # starting point is between the JFI and fillet center
-            initialGuess = Fx - _gear.Rf/2
-
-            sol = least_squares(func, x0=initialGuess)
-            x = sol.x.item()
-            y = -sqrt(_gear.Rf**2 - (x-Fx)**2) + Fy 	# Eq [1] above
-            a = (y-Rd)/(x**2)                               # Eq [3] above
-
-        return [Rd, gamma, x, y, a]
+        stress.calcPitchLineVelocity(self)
+        stress.calcContactStress(self, w)
+        stress.calcBendingStress(self, w)
 
 # Main ########################################################################
 if __name__ == "__main__":
