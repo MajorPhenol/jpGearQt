@@ -204,7 +204,7 @@ class jpgearqt(QWidget):
         # list of layout options
         rb_list = self.ui.bg_layout.buttons()
         for button in rb_list:
-            button.toggled.connect(lambda: draw.drawHelper())
+            button.toggled.connect(lambda: draw.drawHelper(self))
         # use layout button
         self.ui.pb_useLayout.clicked.connect(lambda: self.useLayout())
 
@@ -509,6 +509,7 @@ class jpgearqt(QWidget):
             "E" : _gear.E / self.units.pressureMult,
             "nu" : _gear.nu,
         }
+
     def createJSONMesh(self):
         if self.units.modMult == "M":
             mod = self.mod
@@ -673,7 +674,7 @@ class jpgearqt(QWidget):
 
                 self.populateChart(N2)
 
-        draw.drawHelper()
+        draw.drawHelper(self)
 
     def updatePinionN(self):
         try:
@@ -685,7 +686,7 @@ class jpgearqt(QWidget):
         N2 = round(N1 * GR)
 
         self.populateChart(N2)
-        draw.drawHelper()
+        draw.drawHelper(self)
 
     def populateChart(self, _N2):
         try:
