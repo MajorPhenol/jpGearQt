@@ -20,12 +20,12 @@ class Gear:
         self.Ps = -1                     	# circle pitch
 
         self.Ros = -1                    	# standard outer radius
-        self.Ro = -1     			# actual outer radius
+        self.Ro = 0     			# actual outer radius
         self.Romax = -1     			# max outer radius, i.e. sharp
         self.Rtip = 0				# tip radius
         self.Rtip_max = 0 			# max possible tip radius
         self.Roe = 0    			# effective outer radius, considering tip radius
-        self.Rrim = -1                          # rim radius for internal gear
+        self.Rrim = 0                           # rim radius for internal gear
 
         self.Rr = -1                            # root radius
         self.Rrs = -1                           # standard root radius
@@ -33,6 +33,7 @@ class Gear:
         self.Rff = 0				# root full fillet radius
         self.theta_F = 0			# angle between tooth centerline and root fillet center
         self.phi_JFI = 0			# profile angle at the junction of root fillet and involute, radians
+        self.Rjfi = 0                           # radius of the junction of root fillet and involute
 
         self.Rhp = 0				# highest point of single tooth contact
 

@@ -1,7 +1,7 @@
 {
     "files": [
         "jpgearqt.py",
-        "form.ui",
+        "main.ui",
         "popup.ui",
         "Gear.py",
         "Units.py",

@@ -1,10 +1,8 @@
-from helper import invF
+from helper import tau, Type, invF, revInvF
 from PopupWindow import PopupWindow
 
 from numpy import pi, sin, cos, tan, arcsin, arccos, arctan, sqrt
 from numpy import linspace, rad2deg, deg2rad
-# why isn't this in numpy???
-tau = 2*pi
 
 import matplotlib.pyplot as pyplot
 import matplotlib.path as mpath
@@ -34,16 +32,17 @@ def layoutGear(_jpgear, _gear, save=False):
 
     # Involute
     # find staring point of involute
-    Rjfi = G.Rb/(cos(G.phi_JFI))
+    # Rjfi = G.Rb/(cos(G.phi_JFI))
     theta_JFI = G.tts/(2*G.Rs) + invF(_jpgear.PA) - invF(G.phi_JFI)
-    Rjfi_x = Rjfi*sin(theta_JFI)
-    Rjfi_y = Rjfi*cos(theta_JFI)
+    Rjfi_x = G.Rjfi*sin(theta_JFI)
+    Rjfi_y = G.Rjfi*cos(theta_JFI)
     # create vectors of points along the involute
-    RA = linspace(Rjfi, G.Roe, 20)
+    RA = linspace(G.Rjfi, G.Roe, 20)
     phi_A = arccos(G.Rb/RA)
     theta_A = (G.tts/(2*G.Rs)) + invF(_jpgear.PA) - invF(phi_A)
     RAx = RA*sin(theta_A)
     RAy = RA*cos(theta_A)
+
     # add right side
     invPath = mpath.Path( list(map(list, zip(*[RAx, RAy]))) )
     invPatch = mpatch.PathPatch(invPath, color=curveColor, linewidth=curveWidth, fill=False)
@@ -130,6 +129,7 @@ def layoutGear(_jpgear, _gear, save=False):
         # Center point
         Rtip_x = CF*sin(theta_Otip);
         Rtip_y = CF*cos(theta_Otip);
+
         # find arc angles
         tipStartAngle = rad2deg(phi_Atip - theta_Atip);
         tipEndAngle = 90 - rad2deg(theta_Otip);
@@ -157,6 +157,7 @@ def layoutGear(_jpgear, _gear, save=False):
         else:
                 phi_O = arccos(G.Rb/G.Roe)
                 theta_O = (G.tts/(2*G.Rs)) + invF(_jpgear.PA) - invF(phi_O)
+
         ODStartAngle = -rad2deg(theta_O) + 90
         ODEndAngle = rad2deg(theta_O) + 90
         curveList.append(mpatch.Arc(
@@ -172,10 +173,12 @@ def layoutGear(_jpgear, _gear, save=False):
     if save == True:
         if G.ID == 1:
             defaultName = 'gear1.dxf'
-        else:
+        elif G.ID == 2:
             defaultName = 'gear2.dxf'
+        else:
+            defaultName = 'gear3.dxf'
 
-        savePath, selectedFilter = QFileDialog.getSaveFileName(_jpgear, 'Save Gear'+str(G.ID), defaultName)
+        savePath, selectedFilter = QFileDialog.getSaveFileName(None, 'Save Gear'+str(G.ID), defaultName)
 
         if savePath == '':
             return
@@ -256,9 +259,9 @@ def addCircles(_jpgear, _gear, _canvas, _legend=True):
     # # pitch circle
     circleList.append(pyplot.Circle((0, 0), _gear.Rp / _jpgear.units.lenMult, color='y', ls='--', fill=False, label='Pitch Circle'))
     # # outer circle
-    circleList.append(pyplot.Circle((0, 0), _gear.Roe / _jpgear.units.lenMult, color='g', ls='--', fill=False, label='Outer Circle'))
+    circleList.append(pyplot.Circle((0, 0), _gear.Roe / _jpgear.units.lenMult, color='limegreen', ls='--', fill=False, label='Outer Circle'))
     # # root cirlce
-    circleList.append(pyplot.Circle((0, 0), _gear.Rr / _jpgear.units.lenMult, color='r', ls='--', fill=False, label='Root Circle'))
+    circleList.append(pyplot.Circle((0, 0), _gear.Rr / _jpgear.units.lenMult, color='tomato', ls='--', fill=False, label='Root Circle'))
 
     # adding a legend only works if the circles are added individually, instead of as a collection
     if _legend == True:
@@ -272,47 +275,32 @@ def addCircles(_jpgear, _gear, _canvas, _legend=True):
         circleCollection = mcollections.PatchCollection(circleList, match_original=True)
         return circleCollection
 
-def drawHelper(_jpgear):
+def drawHelper(_jpgear, _N1, _N2, _N3, _p):
     try:
         if _jpgear.units.modMult == "M":
             mod = float(_jpgear.ui.le_targetMod.text())
         elif _jpgear.units.modMult == "T":
             mod = 25.4 / float(_jpgear.ui.le_targetMod.text())
-        N1 = int(_jpgear.ui.le_pN.text())
     except:
+        # print("[drawHelper] bad mod")
         return
 
-    radio_button_list = [
-                       _jpgear.ui.rb_1,
-                       _jpgear.ui.rb_2,
-                       _jpgear.ui.rb_3,
-                       _jpgear.ui.rb_4,
-                       _jpgear.ui.rb_5
-                       ]
-    N2_label_list = [
-                    _jpgear.ui.lb_gN1,
-                    _jpgear.ui.lb_gN2,
-                    _jpgear.ui.lb_gN3,
-                    _jpgear.ui.lb_gN4,
-                    _jpgear.ui.lb_gN5
-                    ]
-    N2 = -1
-    for N, radioButton in zip(N2_label_list, radio_button_list):
-        if radioButton.isChecked():
-            N2 = int(N.text())
-            break
+    Rs1 = (_N1 * mod) / 2
+    Rs2 = (_N2 * mod) / 2
 
-    Rs1 = (N1 * mod) / 2
-    Rs2 = (N2 * mod) / 2
+    Ro1 = ((_N1 + 2) * mod) / 2
 
-    Ro1 = ((N1 + 2) * mod) / 2
-
-    if _jpgear.G2.type == "external":
-        Ro2 = mod * (N2 + 2)/2
+    if _jpgear.type == Type.external:
+        Ro2 = mod * (_N2 + 2)/2
         CD = Rs1 + Rs2
-    elif _jpgear.G2.type == "internal":
-        Ro2 = mod * (N2 + 2 + 3)/2 # add an addition 3*mod for the rim thickness
+    elif _jpgear.type == Type.internal:
+        Ro2 = mod * (_N2 + 2 + 3)/2 # add an addition 3*mod for the rim thickness
         CD = Rs1 - Rs2
+    elif _jpgear.type == Type.planetary:
+        Ro2 = mod * (_N2 + 2 + 3)/2 # add an addition 3*mod for the rim thickness
+        CD = 0
+        Rs3 = (_N3 * mod) / 2
+        Ro3 = mod * (_N3 + 2)/2
 
     circleList = []
     # pitch circle
@@ -322,17 +310,33 @@ def drawHelper(_jpgear):
     circleList.append(pyplot.Circle((0, 0), Ro1, color='g', ls='--', fill=False))
     circleList.append(pyplot.Circle((CD, 0), Ro2, color='g', ls='--', fill=False))
 
+    if _jpgear.type == Type.planetary:
+        circS = pyplot.Circle((0, Rs1+Rs3), Rs3, color='y', ls='--', fill=False)
+        circO = pyplot.Circle((0, Rs1+Rs3), Ro3, color='g', ls='--', fill=False)
+
+        for n in range(_p):
+            angle = (n/_p)*tau - pi/2
+            newCircS = copy.copy(circS)
+            newCircS.set_transform(mtransforms.Affine2D().rotate(angle))
+            circleList.append(newCircS)
+            newCircO = copy.copy(circO)
+            newCircO.set_transform(mtransforms.Affine2D().rotate(angle))
+            circleList.append(newCircO)
+
     circleCol = mcollections.PatchCollection(circleList, match_original=True)
 
     _jpgear.canvasHelper.axes.cla()
 
     sizeBuffer = 0.1 * Ro2
-    if _jpgear.G2.type == "external":
+    if _jpgear.type == Type.external:
         leftLimit = -(Ro1 + sizeBuffer) / _jpgear.units.lenMult
         rightLimit = (CD + Ro2 + sizeBuffer) / _jpgear.units.lenMult
-    elif _jpgear.G2.type == "internal":
+    elif _jpgear.type == Type.internal:
         leftLimit = (CD - (Ro2 + sizeBuffer)) / _jpgear.units.lenMult
         rightLimit = (Ro1 + sizeBuffer) / _jpgear.units.lenMult
+    elif _jpgear.type == Type.planetary:
+        leftLimit = (-(Ro2 + sizeBuffer)) / _jpgear.units.lenMult
+        rightLimit = (Ro2 + sizeBuffer) / _jpgear.units.lenMult
 
     yLimit = (Ro2 + sizeBuffer) / _jpgear.units.lenMult
     _jpgear.canvasHelper.axes.set_xlim(left=leftLimit, right=rightLimit)
@@ -344,18 +348,33 @@ def drawHelper(_jpgear):
 
     _jpgear.canvasHelper.draw()
 
+def drawAllGears(_jpgear, _updateAxes=True):
+    if _jpgear.updateGears():
+        return
+    for gear in _jpgear.gearList:
+        drawGear(_jpgear, gear, _updateAxes=_updateAxes)
+    drawMesh(_jpgear, _updateAxes=_updateAxes)
+
 def drawGear(_jpgear, _gear, _updateAxes = False):
     if _gear.Rb < 0:
         return
 
-    if _gear.ID == 1:
-        canvas = _jpgear.canvasG1
-        cb_singleTooth = _jpgear.ui.cb_singleViewG1
-        cb_circles = _jpgear.ui.cb_circlesG1
-    else:
-        canvas = _jpgear.canvasG2
-        cb_singleTooth = _jpgear.ui.cb_singleViewG2
-        cb_circles = _jpgear.ui.cb_circlesG2
+    match _gear.ID:
+        case 1:
+            canvas = _jpgear.canvasG1
+            cb_singleTooth = _jpgear.ui.cb_singleViewG1
+            cb_circles = _jpgear.ui.cb_circlesG1
+            color = 'b'
+        case 2:
+            canvas = _jpgear.canvasG2
+            cb_singleTooth = _jpgear.ui.cb_singleViewG2
+            cb_circles = _jpgear.ui.cb_circlesG2
+            color = 'r'
+        case 3:
+            canvas = _jpgear.canvasG3
+            cb_singleTooth = _jpgear.ui.cb_singleViewG3
+            cb_circles = _jpgear.ui.cb_circlesG3
+            color = 'g'
 
     if _updateAxes == False:
         leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
@@ -387,14 +406,478 @@ def drawGear(_jpgear, _gear, _updateAxes = False):
 
     curveCol = layoutGear(_jpgear, _gear)
     curveCol.set_transform(mtransforms.Affine2D().scale(1/_jpgear.units.lenMult) + canvas.axes.transData)
-    if _gear.ID == 2:
-        curveCol.set_edgecolor('r')
+    curveCol.set_edgecolor(color)
     canvas.axes.add_collection(curveCol)
 
     if cb_circles.isChecked():
         addCircles(_jpgear, _gear, canvas, _legend=True)
 
     canvas.draw()
+
+def drawMesh(_jpgear, _updateAxes = False):
+    G1 = _jpgear.G1
+    G2 = _jpgear.G2
+    G3 = _jpgear.G3
+    lenMult = _jpgear.units.lenMult
+
+    if G1.Rb < 0 or G2.Rb < 0:
+        # print("[drawMesh] bad Rb1 or Rb2")
+        return
+
+    if _jpgear.type == Type.planetary and G3.Rb < 0:
+        # print("[drawMesh] bad Rb3")
+        return
+
+    # setup canvas
+    canvas = _jpgear.canvasMesh
+    if _updateAxes == False:
+        leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
+    else:
+        tightView = _jpgear.ui.cb_singleViewMesh.isChecked()
+        mesh = None
+        if _jpgear.type == Type.planetary:
+            mesh = 0 if _jpgear.ui.rb_sp.isChecked() else 1
+        leftLimit, rightLimit, bottomLimit, topLimit = getMeshLimits(_jpgear, tightView, mesh)
+
+    canvas.axes.cla()
+    canvas.axes.set_aspect('equal')
+    canvas.axes.set_box_aspect(1)
+    canvas.fig.tight_layout()
+
+    canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
+    canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
+
+    # get slider position
+    slider = _jpgear.ui.hSlider_Mesh
+    # 0 at base circle, 1 at pitch point
+    updateAngle = float(slider.value() / _jpgear.sliderScale) * (_jpgear.OPA1 + invF(_jpgear.OPA1))
+
+    # get LoC points and angles
+    # pitch point happens at slider=1, find overshoot for gear two
+    match _jpgear.type:
+        case Type.external:
+            x, y = getLoCPointsExternal(_jpgear, G1, G2)
+            sliderMin = 0
+            phi_over = arctan(-y[2]/x[2]) + _jpgear.OPA1
+            sliderMax = tan(phi_over) / tan(_jpgear.OPA1)
+
+            # roll back to where LoC meets the base circle
+            startAngles = getStartAngles(_jpgear)
+            angle1 = startAngles[0] - updateAngle
+            angle2 = startAngles[1] + (updateAngle * (G1.N/G2.N))
+
+        case Type.internal:
+            x, y = getLoCPointsInternal(_jpgear, G1, G2, 1)
+            sliderMin = -(G2.N/G1.N - 1)
+            phi_over = arctan(-y[2]/x[2]) + _jpgear.OPA1
+            sliderMax = tan(phi_over) / tan(_jpgear.OPA1)
+
+            # roll back to where LoC meets the base circle
+            startAngles = getStartAngles(_jpgear)
+            angle1 = startAngles[0] - updateAngle
+            angle2 = startAngles[1] - (updateAngle * (G1.N/G2.N))
+
+        case Type.planetary:
+            x, y = getLoCPointsExternal(_jpgear, G1, G3)
+            xP, yP = getLoCPointsInternal(_jpgear, G3, G2, 2)
+            sliderMin = -(G2.N/G1.N - 1)
+            phi_over = arctan(-y[2]/x[2]) + _jpgear.OPA1
+            sliderMax = tan(phi_over) / tan(_jpgear.OPA1)
+
+            # roll back to where LoC meets the base circle
+            startAngles = getStartAngles(_jpgear)
+            angle1 = startAngles[0] - updateAngle
+            angle2 = startAngles[1] + (updateAngle * (G1.N/G2.N))
+            angle3 = startAngles[2] + (updateAngle * (G1.N/G3.N))
+
+    # set slider limits
+    slider.setMinimum(int(sliderMin * _jpgear.sliderScale))
+    slider.setMaximum(int(sliderMax * _jpgear.sliderScale))
+
+    # draw everything
+    match _jpgear.type:
+        case Type.external:
+            curveCol1 = layoutGear(_jpgear, G1)
+            curveCol2 = layoutGear(_jpgear, G2)
+            curveCol2.set_edgecolor('r')
+
+            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + canvas.axes.transData)
+            curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(_jpgear.CD/lenMult, 0) + canvas.axes.transData)
+            canvas.axes.add_collection(curveCol1)
+            canvas.axes.add_collection(curveCol2)
+
+            if _jpgear.ui.cb_circlesMesh.isChecked():
+                addCircles(_jpgear, G1, canvas, _legend=True)
+                circleCol2 = addCircles(_jpgear, G2, canvas, _legend=False)
+                circleCol2.set_transform(mtransforms.Affine2D().translate((_jpgear.CD)/lenMult, 0) + canvas.axes.transData)
+                canvas.axes.add_collection(circleCol2)
+
+        case Type.internal:
+            curveCol1 = layoutGear(_jpgear, G1)
+            curveCol2 = layoutGear(_jpgear, G2)
+            curveCol2.set_edgecolor('r')
+
+            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + canvas.axes.transData)
+            curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(-_jpgear.CD/lenMult, 0) + canvas.axes.transData)
+            canvas.axes.add_collection(curveCol1)
+            canvas.axes.add_collection(curveCol2)
+
+            if _jpgear.ui.cb_circlesMesh.isChecked():
+                addCircles(_jpgear, G1, canvas, _legend=True)
+                circleCol2 = addCircles(_jpgear, G2, canvas, _legend=False)
+                circleCol2.set_transform(mtransforms.Affine2D().translate((-_jpgear.CD)/lenMult, 0) + canvas.axes.transData)
+                canvas.axes.add_collection(circleCol2)
+
+        case Type.planetary:
+            curveCol1 = layoutGear(_jpgear, G1)
+            curveCol2 = layoutGear(_jpgear, G2)
+            curveCol2.set_edgecolor('r')
+
+            curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + canvas.axes.transData)
+            curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult) + canvas.axes.transData)
+
+            canvas.axes.add_collection(curveCol1)
+            canvas.axes.add_collection(curveCol2)
+
+            if _jpgear.ui.cb_circlesMesh.isChecked():
+                addCircles(_jpgear, G1, canvas, _legend=True)
+                circleCol2 = addCircles(_jpgear, G2, canvas, _legend=False)
+                canvas.axes.add_collection(circleCol2)
+
+            curveCol3 = layoutGear(_jpgear, G3)
+            curveCol3.set_edgecolor('g')
+            curveCol3.set_transform(mtransforms.Affine2D().rotate(angle3).scale(1/lenMult).translate(_jpgear.CD/lenMult, 0) + canvas.axes.transData)
+
+            NP = _jpgear.NPlanets
+            for n in range(NP):
+                revAngle = (n/NP)*tau
+                rotAngle = revAngle * G1.N/G3.N
+                newCC = copy.copy(curveCol3)
+                newCC.set_transform(mtransforms.Affine2D().rotate(angle3+rotAngle).scale(1/lenMult).translate(_jpgear.CD/lenMult, 0).rotate(revAngle) + canvas.axes.transData)
+                canvas.axes.add_collection(newCC)
+
+                if _jpgear.ui.cb_circlesMesh.isChecked():
+                    circleColP = addCircles(_jpgear, G3, canvas, _legend=False)
+                    circleColP.set_transform(mtransforms.Affine2D().translate(_jpgear.CD/lenMult, 0).rotate(revAngle) + canvas.axes.transData)
+                    canvas.axes.add_collection(circleColP)
+
+    if _jpgear.ui.cb_LoC.isChecked():
+        # line of contact
+        canvas.axes.plot([x[1],x[2]],[y[1],y[2]], color='k', marker='x', linestyle='--', linewidth=1)
+        loc, = canvas.axes.plot([x[3],x[4]],[y[3],y[4]], color='k', marker='x', linewidth=2, label='Line of Contact')
+        # contact point
+        phi = arctan(updateAngle)
+        traceAngle = _jpgear.OPA1 - phi
+        R = (G1.Rb/cos(phi)) / lenMult
+        traceX = R*cos(traceAngle)
+        traceY = R*sin(traceAngle)
+        tracePoint, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
+        legendPoint = canvas.axes.legend(handles=[loc, tracePoint], loc='lower left', framealpha=1.0)
+        canvas.axes.add_artist(legendPoint)
+
+        if _jpgear.type == Type.planetary:
+            canvas.axes.plot([xP[1],xP[2]],[-yP[1],-yP[2]], color='k', marker='x', linestyle='--', linewidth=1)
+            loc, = canvas.axes.plot([xP[3],xP[4]],[-yP[3],-yP[4]], color='k', marker='x', linewidth=2, label='Line of Contact')
+
+            if G3.N%2 == 0:
+                # angle from horizontal to centerline of imaginary tooth if it touched the pitch point
+                alphaC1 = G3.tt/(2*G3.Rp)
+                # gamma of tooth if it touched the pitch point, relative to horizontal
+                gammaH = _jpgear.OPA2
+                # gamma of pitch tooth relative to its own centerline
+                gamma1 = gammaH - alphaC1
+                # angle from horizontal to center of previous tooth
+                alphaC2 = (tau/G3.N) - alphaC1
+                # gamma of previous tooth relative to its own centerline
+                gamma2 = gamma1 - (alphaC2 - alphaC1)
+                # profile angle of previous tooth
+                # GOIG 2.39
+                phi2 = arctan((gamma2) + invF(_jpgear.PA) + (G3.tts/(2*G3.Rs)))
+                theta = (G3.tts/(2*G3.Rs)) + invF(_jpgear.PA) - invF(phi2)
+                # angle from base of tooth to horizontal when at pitch position (i.e. slider=1)
+                base_offset = alphaC2 - theta - invF(phi2)
+
+            else:
+                base_offset = pi/G3.N - (G3.tt/(G3.Rp)) - invF(_jpgear.OPA2)
+
+            # roll back to base circle
+            base_start = base_offset + tan(_jpgear.OPA1)*(G1.N/G3.N)
+            base_angle = updateAngle*(G1.N/G3.N) - base_start
+
+            phi = arctan(base_angle + _jpgear.OPA2)
+            R = G3.Rb/cos(phi)
+            traceAngle = phi - _jpgear.OPA2
+            traceX = R*cos(traceAngle) + _jpgear.CD
+            traceY = R*sin(traceAngle)
+            tracePointP, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
+
+    canvas.draw()
+
+def getMeshLimits(_jpgear, _tight, _mesh=0):
+    if _jpgear.type == Type.external:
+        if _tight:
+            topLimit = (_jpgear.G1.Rp*sin(tau/_jpgear.G1.N)) / _jpgear.units.lenMult
+            bottomLimit = -topLimit
+            leftLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) - topLimit
+            rightLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) + topLimit
+        else:
+            sizeBuffer = 0.1 * _jpgear.G2.Ro
+            leftLimit = (-_jpgear.G1.Ro - sizeBuffer) / _jpgear.units.lenMult
+            rightLimit = (_jpgear.CD + _jpgear.G2.Ro + sizeBuffer) / _jpgear.units.lenMult
+            topLimit = (max(_jpgear.G1.Ro, _jpgear.G2.Ro) + sizeBuffer) / _jpgear.units.lenMult
+            bottomLimit = -topLimit
+
+    if _jpgear.type == Type.internal:
+        if _tight:
+            topLimit = (_jpgear.G1.Rp*sin(tau/_jpgear.G1.N)) / _jpgear.units.lenMult
+            bottomLimit = -topLimit
+            rightLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) + topLimit
+            leftLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) - topLimit
+        else:
+            sizeBuffer = 0.1 * _jpgear.G2.Rrim
+            leftLimit = (-_jpgear.CD - _jpgear.G2.Rrim - sizeBuffer) / _jpgear.units.lenMult
+            rightLimit = (_jpgear.G2.Rrim - _jpgear.CD + sizeBuffer) / _jpgear.units.lenMult
+            topLimit = (_jpgear.G2.Rrim + sizeBuffer) / _jpgear.units.lenMult
+            bottomLimit = -topLimit
+
+    if _jpgear.type == Type.planetary:
+        if _tight:
+            if _mesh == 0:
+                topLimit = (_jpgear.G1.Rp*sin(tau/_jpgear.G1.N)) / _jpgear.units.lenMult
+                bottomLimit = -topLimit
+                rightLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) + topLimit
+                leftLimit = (_jpgear.G1.Rp / _jpgear.units.lenMult) - topLimit
+            elif _mesh == 1:
+                sizeBuffer = 0.1 * _jpgear.G2.Rrim
+                topLimit = (_jpgear.G3.Rp*sin(tau/_jpgear.G3.N)) / _jpgear.units.lenMult
+                bottomLimit = -topLimit
+                rightLimit = ((_jpgear.G1.Rp + 2*_jpgear.G3.Rp) / _jpgear.units.lenMult) + topLimit
+                leftLimit = ((_jpgear.G1.Rp + 2*_jpgear.G3.Rp) / _jpgear.units.lenMult) - topLimit
+        else:
+            sizeBuffer = 0.1 * _jpgear.G2.Rrim
+            topLimit = (_jpgear.G2.Rrim + sizeBuffer) / _jpgear.units.lenMult
+            bottomLimit = -topLimit
+            rightLimit = topLimit
+            leftLimit = -rightLimit
+
+    return leftLimit, rightLimit, bottomLimit, topLimit
+
+def getLoCPointsExternal(_jpgear, _G1, _G2):
+    # pitch point
+    x0 = _G1.Rp
+    y0 = 0
+    # tangent to gear 1 at base circle
+    x1 = _G1.Rb*cos(_jpgear.OPA1)
+    y1 = _G1.Rb*sin(_jpgear.OPA1)
+    # tangent to gear 2 at base circle
+    x2 = (_jpgear.CD - _G2.Rb*cos(_jpgear.OPA1))
+    y2 = (-_G2.Rb*sin(_jpgear.OPA1))
+    # find end of contact on LoC at Roe
+    # law of sines => A/sin(a) = B/sin(b)
+    a = _jpgear.OPA1 + deg2rad(90)
+    b = arcsin( (_G1.Rp/_G1.Roe) * sin(a) )
+    c = deg2rad(180) - a - b
+    x3 = _G1.Roe * cos(c)
+    y3 = -_G1.Roe * sin(c)
+    b = arcsin( (_G2.Rp/_G2.Roe) * sin(a) )
+    c = deg2rad(180) - a - b
+    x4 = _jpgear.CD - (_G2.Roe * cos(c))
+    y4 = _G2.Roe * sin(c)
+
+    # Cjfi = sqrt(_G1.Rp**2 - _G1.Rb**2) - sqrt(_G1.Rjfi**2 - _G1.Rb**2)
+    # x5 = _G1.Rp - Cjfi*sin(_jpgear.OPA1)
+    # y5 = Cjfi*cos(_jpgear.OPA1)
+
+    # Cjfi = sqrt(_G2.Rp**2 - _G2.Rb**2) - sqrt(_G2.Rjfi**2 - _G2.Rb**2)
+    # x6 = _G1.Rp + Cjfi*sin(_jpgear.OPA1)
+    # y6 = -Cjfi*cos(_jpgear.OPA1)
+
+
+    xList = [x0, x1, x2, x3, x4]
+    xList[:] = [x / _jpgear.units.lenMult for x in xList]
+    yList = [y0, y1, y2, y3, y4]
+    yList[:] = [y / _jpgear.units.lenMult for y in yList]
+
+    return xList, yList
+
+def getLoCPointsInternal(_jpgear, _G1, _G2, _n):
+    if _n == 1:
+        OPA = _jpgear.OPA1
+        shift = 0
+    elif _n == 2:
+        OPA = _jpgear.OPA2
+        shift = _jpgear.CD
+
+    # pitch point
+    # x0 = _G1.Rp
+    x0 = _G1.Rp + shift
+    y0 = 0
+    # tangent to gear 2 at base circle
+    x1 = -_jpgear.CD + shift + _G2.Rb*cos(OPA)
+    y1 = _G2.Rb*sin(OPA)
+    # intersect gear 2 at rim
+    # law of sines => A/sin(a) = B/sin(b)
+    a = OPA + deg2rad(90)
+    b = arcsin( (_G2.Rp/_G2.Rrim) * sin(a) )
+    c = deg2rad(180) - a - b
+    x2 = -_jpgear.CD + shift + (_G2.Rrim * cos(c))
+    y2 = -_G2.Rrim * sin(c)
+    # find end of contact on LoC at Roe
+    b = arcsin( (_G1.Rp/_G1.Roe) * sin(a) )
+    c = deg2rad(180) - a - b
+    x3 = _G1.Roe * cos(c) + shift
+    y3 = -_G1.Roe * sin(c)
+    # find end of contact on LoC at JFI
+    R_JFI = _G2.Rb/cos(_G2.phi_JFI)
+    # b = arcsin( (_G2.Rp/_G2.Rr) * sin(a) )
+    b = arcsin( (_G2.Rp/R_JFI) * sin(a) )
+    c = deg2rad(180) - a - b
+    x4 = -_jpgear.CD + shift + (R_JFI * cos(c))
+    # x4 = -_jpgear.CD + (_G2.Rr * cos(c))
+    y4 = -R_JFI * sin(c)
+    # y4 = -_G2.Rr * sin(c)
+
+    xList = [x0, x1, x2, x3, x4]
+    xList[:] = [x / _jpgear.units.lenMult for x in xList]
+
+    yList = [y0, y1, y2, y3, y4]
+    yList[:] = [y / _jpgear.units.lenMult for y in yList]
+
+    return xList, yList
+
+def getPitchAngles(_jpgear, _G1, _G2, _n, _dir):
+    # make the teeth mesh nicely
+    ratio = _G1.N / _G2.N
+    # angle from tooth centerline to pitchpoint
+    theta_P1 = _G1.tt/(2*_G1.Rp)
+    theta_P2 = _G2.tt/(2*_G2.Rp)
+    # angle where teeth meet at pitchpoint
+    pitchAngle1 = -pi/2 + theta_P1
+
+    if _n == 1:
+        pitchAngle2 = (pi/2*_dir) + theta_P2
+    elif _n == 2:
+        pitchAngle2 = (pi/2*_dir) - theta_P2 + ratio*(pi + 2*theta_P1)
+
+    return [pitchAngle1, pitchAngle2]
+
+def getStartAngles(_jpgear):
+    startAngles = [0, 0, 0]
+
+    match _jpgear.type:
+        case Type.external:
+            ratio = _jpgear.G1.N/_jpgear.G2.N
+            pitchAngles = getPitchAngles(_jpgear, _jpgear.G1, _jpgear.G2, 1, 1)
+            startAngles[0] = pitchAngles[0] + _jpgear.OPA1 + invF(_jpgear.OPA1)
+            startAngles[1] = pitchAngles[1] - ratio*(_jpgear.OPA1 + invF(_jpgear.OPA1))
+
+        case Type.internal:
+            ratio = _jpgear.G1.N/_jpgear.G2.N
+            pitchAngles = getPitchAngles(_jpgear, _jpgear.G1, _jpgear.G2, 1, -1)
+            startAngles[0] = pitchAngles[0] + _jpgear.OPA1 + invF(_jpgear.OPA1)
+            startAngles[1] = pitchAngles[1] + ratio*(_jpgear.OPA1 + invF(_jpgear.OPA1))
+
+        case Type.planetary:
+            ratio1 = _jpgear.G1.N/_jpgear.G3.N
+            pitchAngles = getPitchAngles(_jpgear, _jpgear.G1, _jpgear.G3, 1, 1)
+            startAngles[0] = pitchAngles[0] + _jpgear.OPA1 + invF(_jpgear.OPA1)
+            startAngles[2] = pitchAngles[1] - ratio1*(_jpgear.OPA1 + invF(_jpgear.OPA1))
+
+            ratio2 = _jpgear.G1.N/_jpgear.G2.N
+            pitchAnglesP = getPitchAngles(_jpgear, _jpgear.G3, _jpgear.G2, 2, -1)
+            startAngles[1] = pitchAnglesP[1] - ratio2*(_jpgear.OPA1 + invF(_jpgear.OPA1))
+
+    return startAngles
+
+def createAnimWindow(_jpgear):
+    G1 = _jpgear.G1
+    G2 = _jpgear.G2
+    G3 = _jpgear.G3
+    lenMult = _jpgear.units.lenMult
+
+    if G1.Rb < 0 or G2.Rb < 0:
+        # print("[createAnimWindow] bad Rb1 or Rb2")
+        return
+
+    if _jpgear.type == Type.planetary and G3.Rb < 0:
+        # print("[createAnimWindow] bad Rb3")
+        return
+
+    window = PopupWindow(_jpgear)
+    window.setWindowTitle("Mesh Animation")
+
+    window.ui.vLayout_popup.insertWidget(0, window.canvas)
+    toolbar = NavigationToolbar2QT(window.canvas, _jpgear)
+    window.ui.hLayout_toolbarAnim.insertWidget(0, toolbar)
+
+    window.updateAnimAxes()
+    window.canvas.axes.set_aspect('equal')
+    window.canvas.fig.tight_layout()
+
+    curveCol1 = layoutGear(_jpgear, G1)
+    curveCol2 = layoutGear(_jpgear, G2)
+    curveCol2.set_edgecolor('r')
+
+    window.canvas.axes.add_collection(curveCol1)
+    window.canvas.axes.add_collection(curveCol2)
+
+    if _jpgear.type == Type.planetary:
+        curveCol3 = layoutGear(_jpgear, G3)
+        curveCol3.set_edgecolor('g')
+        curveCol3List = []
+
+        NP = _jpgear.NPlanets
+        for n in range(NP):
+            curveCol3List.append(copy.copy(curveCol3))
+            window.canvas.axes.add_collection(curveCol3List[n])
+
+    # animation specs
+    slider = window.ui.hSlider_Speed
+    maxSpeed = slider.maximum()                 # RPM
+    msPerRev = (60*1000)/maxSpeed               # milliseconds per revolution
+    interval = 30                               # ms per frame
+    framesPerRev = int(msPerRev / interval)	# frames for one rev
+    ratio = G1.N / G2.N
+
+    # starting position
+    startAngles = getStartAngles(_jpgear)
+
+    def animFunc(frame, _maxSpeed, _slider, _type):
+        speed = float(_slider.value())
+        updateAngle = (speed/_maxSpeed) * (tau*frame)/framesPerRev
+
+        match _type:
+            case Type.external:
+                angle1 = startAngles[0] - updateAngle
+                angle2 = startAngles[1] + (updateAngle*(G1.N/G2.N))
+
+                curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + window.canvas.axes.transData)
+                curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(_jpgear.CD/lenMult, 0) + window.canvas.axes.transData)
+
+            case Type.internal:
+                angle1 = startAngles[0] - updateAngle
+                angle2 = startAngles[1] - (updateAngle*(G1.N/G2.N))
+
+                curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + window.canvas.axes.transData)
+                curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(-_jpgear.CD/lenMult, 0) + window.canvas.axes.transData)
+
+            case Type.planetary:
+                angle1 = startAngles[0] - updateAngle
+                angle2 = startAngles[1] + (updateAngle*(G1.N/G2.N))
+                angle3 = startAngles[2] + (updateAngle*(G1.N/G3.N))
+
+                curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + window.canvas.axes.transData)
+                curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult) + window.canvas.axes.transData)
+
+                for n in range(NP):
+                    revAngle = (n/NP)*tau
+                    curveCol3List[n].set_transform(mtransforms.Affine2D().rotate(angle3).scale(1/lenMult).translate(_jpgear.CD/lenMult, 0).rotate(revAngle) + window.canvas.axes.transData)
+
+    window.anim = manimation.FuncAnimation(window.canvas.fig, animFunc, fargs=[maxSpeed, slider, _jpgear.type], frames=framesPerRev, interval=interval)
+
+    window.canvas.draw()
+
+    window.show()
 
 def drawStress(_jpgear, _gear, _canvas, _lewisParams):
     dir = 1 if _gear.type == "external" else -1
@@ -418,8 +901,12 @@ def drawStress(_jpgear, _gear, _canvas, _lewisParams):
     curveCol = layoutGear(_jpgear, _gear)
     if _gear.ID == 2:
         curveCol.set_edgecolor('r')
-        if _gear.type == "internal":
-            curveCol.set_transform(mtransforms.Affine2D().scale(1/_jpgear.units.lenMult).rotate(pi/_gear.N) + _canvas.axes.transData)
+    if _gear.ID == 3:
+        curveCol.set_edgecolor('g')
+
+    if _gear.type == "internal":
+        curveCol.set_transform(mtransforms.Affine2D().scale(1/_jpgear.units.lenMult).rotate(pi/_gear.N) + _canvas.axes.transData)
+
     _canvas.axes.add_collection(curveCol)
     # add parabola
     Rd, gamma, x_Lewis, y_Lewis, a_Lewis = _lewisParams
@@ -456,231 +943,3 @@ def drawStress(_jpgear, _gear, _canvas, _lewisParams):
 
     _canvas.axes.legend(loc='upper right', framealpha=1.0)
     _canvas.draw()
-
-def drawMesh(_jpgear, _updateAxes = False):
-    G1 = _jpgear.G1
-    G2 = _jpgear.G2
-    lenMult = _jpgear.units.lenMult
-
-    if G1.Rb < 0 or G2.Rb < 0:
-        return
-
-    canvas = _jpgear.canvasMesh
-    cb_singleTooth = _jpgear.ui.cb_singleViewMesh
-    cb_circles = _jpgear.ui.cb_circlesMesh
-
-    if _updateAxes == False:
-        leftLimit, rightLimit, bottomLimit, topLimit = canvas.axes.axis()
-    else:
-        # tight mesh view
-        if cb_singleTooth.isChecked():
-            topLimit = (G1.Rp*sin(tau/G1.N)) / lenMult
-            bottomLimit = -topLimit
-            leftLimit = (G1.Rp / lenMult) - topLimit
-            rightLimit = (G1.Rp / lenMult) + topLimit
-        # full gear view
-        else:
-            if _jpgear.G2.type == "external":
-                sizeBuffer = 0.1 * G2.Ro
-                leftLimit = (-G1.Ro - sizeBuffer) / lenMult
-                rightLimit = (_jpgear.CD + G2.Ro + sizeBuffer) / lenMult
-            elif _jpgear.G2.type == "internal":
-                sizeBuffer = 0.1 * G2.Rrim
-                leftLimit = (-_jpgear.CD - G2.Rrim - sizeBuffer) / lenMult
-                rightLimit = (G2.Rrim - _jpgear.CD + sizeBuffer) / lenMult
-
-            topLimit = (max(G1.Ro, G2.Ro) + sizeBuffer) / lenMult
-            bottomLimit = -topLimit
-
-    canvas.axes.cla()
-
-    canvas.axes.set_aspect('equal')
-    canvas.axes.set_box_aspect(1)
-    canvas.fig.tight_layout()
-
-    canvas.axes.set_xlim(left=leftLimit, right=rightLimit)
-    canvas.axes.set_ylim(bottom=bottomLimit, top=topLimit)
-
-    # Points for line of contact
-    dir = 1 if G2.type == "external" else -1
-    # pitch point
-    x0 = G1.Rp
-    y0 = 0
-    if G2.type == "external":
-        # tangent to gear 1 at base circle
-        x1 = G1.Rb*cos(_jpgear.OPA)
-        y1 = G1.Rb*sin(_jpgear.OPA)
-        # tangent to gear 2 at base circle
-        x2 = (_jpgear.CD - G2.Rb*cos(_jpgear.OPA)) * dir
-        y2 = (-G2.Rb*sin(_jpgear.OPA)) * dir
-        # find end of contact on LoC at Roe
-        # law of sines => A/sin(a) = B/sin(b)
-        a = _jpgear.OPA + deg2rad(90)
-        b = arcsin( (G1.Rp/G1.Roe) * sin(a) )
-        c = deg2rad(180) - a - b
-        x3 = G1.Roe * cos(c)
-        y3 = -G1.Roe * sin(c)
-        b = arcsin( (G2.Rp/G2.Roe) * sin(a) )
-        c = deg2rad(180) - a - b
-        x4 = _jpgear.CD - (G2.Roe * cos(c))
-        y4 = G2.Roe * sin(c)
-    elif G2.type == "internal":
-        # tangent to gear 2 at base circle
-        x1 = (_jpgear.CD - G2.Rb*cos(_jpgear.OPA)) * dir
-        y1 = (-G2.Rb*sin(_jpgear.OPA)) * dir
-        # intersect gear 2 at rim
-        # law of sines => A/sin(a) = B/sin(b)
-        a = _jpgear.OPA + deg2rad(90)
-        b = arcsin( (G2.Rp/G2.Rrim) * sin(a) )
-        c = deg2rad(180) - a - b
-        x2 = -_jpgear.CD + (G2.Rrim * cos(c))
-        y2 = -G2.Rrim * sin(c)
-        # find end of contact on LoC at Roe
-        b = arcsin( (G1.Rp/G1.Roe) * sin(a) )
-        c = deg2rad(180) - a - b
-        x3 = G1.Roe * cos(c)
-        y3 = -G1.Roe * sin(c)
-        b = arcsin( (G2.Rp/G2.Rr) * sin(a) )
-        c = deg2rad(180) - a - b
-        x4 = -_jpgear.CD + (G2.Rr * cos(c))
-        y4 = -G2.Rr * sin(c)
-    # scale to the right units
-    x1 = x1 / lenMult
-    x2 = x2 / lenMult
-    x3 = x3 / lenMult
-    x4 = x4 / lenMult
-    y1 = y1 / lenMult
-    y2 = y2 / lenMult
-    y3 = y3 / lenMult
-    y4 = y4 / lenMult
-
-    # config slider
-    slider = _jpgear.ui.hSlider_Mesh
-    # pitch point happens at slider=1
-    # find overshoot for gear two
-    if G2.type == "external":
-        sliderMin = 0
-        over_angle = arctan(-y2/x2)
-        overshoot = over_angle / _jpgear.OPA
-    elif G2.type == "internal":
-        under_angle = arctan(y1/x1)
-        sliderMin = 1 - under_angle / _jpgear.OPA
-        over_angle = arctan(-y2/x2)
-        overshoot = over_angle / _jpgear.OPA
-    sliderMax = 1 + overshoot
-
-    slider.setMinimum(int(sliderMin * _jpgear.sliderScale))
-    slider.setMaximum(int(sliderMax * _jpgear.sliderScale))
-
-    # make the teeth mesh nicely
-    ratio = G1.N / G2.N
-    # profile angle at pitch circle
-    phi_P1 = arccos(G1.Rb/G1.Rp)
-    phi_P2 = arccos(G2.Rb/G2.Rp)
-    # angle from tooth centerline to pitchpoint
-    theta_P1 = G1.tt/(2*G1.Rp)
-    theta_P2 = G2.tt/(2*G2.Rp)
-    # angle where teeth meet at pitchpoint
-    startAngle1 = -pi/2 + theta_P1
-    startAngle2 = (pi/2 * dir) + theta_P2
-    # roll back to where LoC meets the base circle
-    curveStartAngle1 = startAngle1 + _jpgear.OPA + invF(_jpgear.OPA)
-    curveStartAngle2 = startAngle2 - dir * ratio * (_jpgear.OPA + invF(_jpgear.OPA))
-
-    phi_A = float(slider.value() / _jpgear.sliderScale) * _jpgear.OPA
-    updateAngle = phi_A + invF(phi_A)
-
-    angle1 = curveStartAngle1 - (updateAngle)
-    angle2 = curveStartAngle2 + (updateAngle * ratio * dir)
-
-    # draw everything
-    curveCol1 = layoutGear(_jpgear, G1)
-    curveCol2 = layoutGear(_jpgear, G2)
-    curveCol2.set_edgecolor('r')
-
-    curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + canvas.axes.transData)
-    curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(dir * _jpgear.CD/lenMult, 0) + canvas.axes.transData)
-    canvas.axes.add_collection(curveCol1)
-    canvas.axes.add_collection(curveCol2)
-
-    if cb_circles.isChecked():
-        addCircles(_jpgear, G1, canvas, _legend=True)
-
-        circleCol2 = addCircles(_jpgear, G2, canvas, _legend=False)
-        circleCol2.set_transform(mtransforms.Affine2D().translate((_jpgear.CD*dir)/lenMult, 0) + canvas.axes.transData)
-        canvas.axes.add_collection(circleCol2)
-
-    if _jpgear.ui.cb_LoC.isChecked():
-        # line of contact
-        canvas.axes.plot([x1,x2],[y1,y2], color='k', marker='x', linestyle='--', linewidth=1)
-        loc, = canvas.axes.plot([x3,x4],[y3,y4], color='k', marker='x', linewidth=2, label='Line of Contact')
-        # contact point
-        traceAngle = _jpgear.OPA - phi_A
-        R = (G1.Rb/cos(phi_A)) / lenMult
-        traceX = R*cos(traceAngle)
-        traceY = R*sin(traceAngle)
-        tracePoint, = canvas.axes.plot([traceX], [traceY], color='tab:orange', marker='o', linestyle='', linewidth=2, label='Point of Contact')
-        legendPoint = canvas.axes.legend(handles=[loc, tracePoint], loc='lower left', framealpha=1.0)
-        canvas.axes.add_artist(legendPoint)
-
-        # HP_angle = arcsin((G1.Rp/G1.Rhp)*sin(_jpgear.OPA + deg2rad(90)))
-        # HP_X = G1.Rhp*cos(deg2rad(180) - HP_angle - _jpgear.OPA - deg2rad(90))
-        # HP_Y = -G1.Rhp*sin(deg2rad(180) - HP_angle- _jpgear.OPA - deg2rad(90))
-        # HP_Point, = canvas.axes.plot([HP_X], [HP_Y], color='r', marker='o', linestyle='', linewidth=2, label='HPSTC')
-        # canvas.axes.add_artist(HP_Point)
-
-    canvas.draw()
-def createAnimWindow(_jpgear):
-    G1 = _jpgear.G1
-    G2 = _jpgear.G2
-    lenMult = _jpgear.units.lenMult
-
-    if G1.Rb < 0 or G2.Rb < 0:
-        return
-
-    window = PopupWindow(_jpgear)
-    window.setWindowTitle("Mesh Animation")
-
-    window.ui.vLayout_popup.insertWidget(0, window.canvas)
-    toolbar = NavigationToolbar2QT(window.canvas, _jpgear)
-    window.ui.hLayout_toolbarAnim.insertWidget(0, toolbar)
-
-    window.updateAnimAxes()
-    window.canvas.axes.set_aspect('equal')
-    window.canvas.fig.tight_layout()
-
-    curveCol1 = layoutGear(_jpgear, G1)
-    curveCol2 = layoutGear(_jpgear, G2)
-    curveCol2.set_edgecolor('r')
-
-    window.canvas.axes.add_collection(curveCol1)
-    window.canvas.axes.add_collection(curveCol2)
-
-    # animation specs
-    slider = window.ui.hSlider_Speed
-    maxSpeed = slider.maximum()             # RPM
-    msPerRev = (60*1000)/maxSpeed           # milliseconds per revolution
-    interval = 30                           # ms per frame
-    framesPerRev = int(msPerRev / interval)	# frames for one rev
-    ratio = G1.N / G2.N
-    # starting position
-    dir = 1 if G2.type == "external" else -1
-    offset = pi/G2.N if G2.type == "external" else 0
-    startAngle1 = -pi/2
-    startAngle2 = (pi/2 - 0.5*_jpgear.bkl/G2.Rs) * dir + offset
-
-    def animFunc(frame, _maxSpeed, _slider):
-        speed = float(_slider.value())
-        updateAngle = (speed/_maxSpeed) * (tau*frame)/framesPerRev
-
-        angle1 = startAngle1 - updateAngle
-        angle2 = startAngle2 + (ratio*updateAngle*dir)
-
-        curveCol1.set_transform(mtransforms.Affine2D().rotate(angle1).scale(1/lenMult) + window.canvas.axes.transData)
-        curveCol2.set_transform(mtransforms.Affine2D().rotate(angle2).scale(1/lenMult).translate(dir*_jpgear.CD/lenMult, 0) + window.canvas.axes.transData)
-
-    window.anim = manimation.FuncAnimation(window.canvas.fig, animFunc, fargs=[maxSpeed, slider], frames=framesPerRev, interval=interval)
-
-    window.canvas.draw()
-
-    window.show()

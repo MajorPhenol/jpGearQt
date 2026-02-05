@@ -1,96 +1,85 @@
 import draw
-from helper import invF
+from helper import tau, Type, invF, setText
 
 from numpy import pi, sin, cos, tan, arccos, arctan
 from numpy import sqrt, real
-# why isn't this in numpy???
-tau = 2*pi
 
 from scipy.optimize import least_squares
 
 def calcPitchLineVelocity(_jpgear):
     velocity = (tau * _jpgear.G1.Rp * (_jpgear.RPM / 60)) / 1000
-    _jpgear.setText(_jpgear.ui.lb_pitchLineVel, velocity, _jpgear.units.velMult)
+    setText(_jpgear.ui.lb_pitchLineVel, velocity, _jpgear.units.velMult)
 
-def calcContactStress(_jpgear, _w):
-    G1 = _jpgear.G1
-    G2 = _jpgear.G2
-    # elastic coefficient
-    E1 = _jpgear.G1.E
-    E2 = _jpgear.G2.E
-    nu1 = _jpgear.G1.nu
-    nu2 = _jpgear.G2.nu
-
-    Cp = 1/sqrt( (pi*(1-nu1**2)/E1) + (pi*(1-nu2**2)/E2) )
+def calcContactStress(_G1, _G2, _OPA, _w):
+    Cp = 1/sqrt( (pi*(1-_G1.nu**2)/_G1.E) + (pi*(1-_G2.nu**2)/_G2.E) )
 
     # max contact stress occurs at lowest point of single tooth contact
-    rho1 = sqrt(G1.Roe**2 - G1.Rb**2) - G1.Pb       # AGMA C2
-    rho2 = G1.Rb * G2.Rb * tan(_jpgear.OPA) - rho1  # AGMA C6 - C2
+    rho1 = sqrt(_G1.Roe**2 - _G1.Rb**2) - _G1.Pb       # AGMA C2
+    rho2 = _G1.Rb * _G2.Rb * tan(_OPA) - rho1  # AGMA C6 - C2
 
     stress = Cp * sqrt(_w * ( (rho1+rho2)/(rho1*rho2) ))
+    return stress
 
-    _jpgear.setText(_jpgear.ui.lb_stressC1, stress, _jpgear.units.pressureMult)
-    _jpgear.setText(_jpgear.ui.lb_stressC2, stress, _jpgear.units.pressureMult)
+def calcBendingStress(_jpgear, _gear, _force, _lewisParams, _mesh):
+    if _mesh == 1:
+        OPA = _jpgear.OPA1_deg
+        CR = _jpgear.CR1
+    elif _mesh ==2:
+        OPA = _jpgear.OPA2_deg
+        CR = _jpgear.CR2
 
-def calcBendingStress(_jpgear, _w):
     # Constants for stress concentration factor Kf
     # from GOIG 11.24 - 11.26
     # Note that GOIG uses degrees while AGMA 908 uses radians
-    k1 = 0.3054 - 0.00489*_jpgear.OPA_deg - 0.000069*_jpgear.OPA_deg**2
-    k2 = 0.3620 - 0.01268*_jpgear.OPA_deg + 0.000104*_jpgear.OPA_deg**2
-    k3 = 0.2934 + 0.00609*_jpgear.OPA_deg + 0.000087*_jpgear.OPA_deg**2
+    k1 = 0.3054 - 0.00489*OPA - 0.000069*OPA**2
+    k2 = 0.3620 - 0.01268*OPA + 0.000104*OPA**2
+    k3 = 0.2934 + 0.00609*OPA + 0.000087*OPA**2
 
-    for _gear, _canvas in zip([_jpgear.G1, _jpgear.G2], [_jpgear.canvasStress1, _jpgear.canvasStress2]):
-        # Lewis parabola key points
-        if _gear.type == "external":
-            lewisParams = lewisParabolaExternal(_jpgear, _gear)
-            R = _gear.Rf
-        elif _gear.type == "internal":
-            lewisParams = lewisParabolaInternal(_jpgear, _gear)
-            R = _gear.Rtip
-        Rc, gamma, x_Lewis, y_Lewis, a_Lewis = lewisParams
+    # Lewis parabola key points
+    if _gear.type == "external":
+        R = _gear.Rf
+    elif _gear.type == "internal":
+        R = _gear.Rtip
 
-        # Lewis parabola dimensions
-        tt_LP = 2*x_Lewis           # tooth thickness at critical section
-        h_LP = abs(Rc - y_Lewis)    # height of Lewis parabola
+    Rc, gamma, x_Lewis, y_Lewis, a_Lewis = _lewisParams
 
-        # please don't divide by zero
-        if R < 0.001:
-            R = 0.001
+    # Lewis parabola dimensions
+    tt_LP = 2*x_Lewis           # tooth thickness at critical section
+    h_LP = abs(Rc - y_Lewis)    # height of Lewis parabola
 
-        # Stress concentration factor from GOIG 11.23
-        Kf = k1 + ( (tt_LP/R)**k2 ) * ( (tt_LP/h_LP)**k3 )
+    # please don't divide by zero
+    if R < 0.001:
+        R = 0.001
 
-        # GOIG 11.28, reworked
-        # Note that I factored out the 'm' and split the equation into
-        # pieces to make it more legible
+    # Stress concentration factor from GOIG 11.23
+    Kf = k1 + ( (tt_LP/R)**k2 ) * ( (tt_LP/h_LP)**k3 )
 
-        # stress_bending = Mx/I, where:
-        #   M: moment, f_tan * height
-        #   I: second moment of inertia for rectangluar beam, bt^3/12, where:
-        #       b: depth, or face width (already captured in _w)
-        #       t: thickness
-        #       substitute t = 2x_lewis:
-        #       => I = x_lewis^3/1.5
-        f_tan = _w * cos(gamma)     # _w includes face width
-        M_tan = f_tan * h_LP
-        I_bend = x_Lewis**3 / 1.5
-        # stress_radial = f_rad / area
-        f_rad = _w * sin(gamma)     # _w includes face width
-        # total stress is bending stress minus radial stress
-        stress = Kf*(M_tan*x_Lewis/I_bend - f_rad/tt_LP)
+    # GOIG 11.28, reworked
+    # Note that I factored out the 'm' and split the equation into
+    # pieces to make it more legible
 
-        # TODO: calculate this properly
-        if _jpgear.CR >= 2:
-            stress = stress * 0.65
+    # bending stress = Mx/I, where:
+    #   M: moment, f_tan * height
+    #   I: second moment of inertia for rectangluar beam, bt^3/12, where:
+    #       b: depth, or face width
+    #       t: thickness
+    #       substitute t = 2*x_lewis:
+    #       => I = FW*x_lewis^3/1.5
+    f_tan = _force * cos(gamma)
+    M_tan = f_tan * h_LP
+    I_bend = (_gear.FW * x_Lewis**3) / 1.5
+    stressB = M_tan*x_Lewis/I_bend
+    # radial stress = f_rad / area
+    f_rad = _force * sin(gamma)
+    stressR = f_rad/(tt_LP*_gear.FW)
+    # total stress is bending stress minus radial stress
+    stress = Kf*(stressB - stressR)
 
-        if _gear.ID == 1:
-            _jpgear.setText(_jpgear.ui.lb_stressB1, stress, _jpgear.units.pressureMult)
-        else:
-            _jpgear.setText(_jpgear.ui.lb_stressB2, stress, _jpgear.units.pressureMult)
+    # TODO: calculate this properly
+    if CR >= 2:
+        stress = stress * 0.65
 
-        # draw tooth
-        draw.drawStress(_jpgear, _gear, _canvas, lewisParams)
+    return stress
 
 def lewisParabolaExternal(_jpgear, _gear):
     """
